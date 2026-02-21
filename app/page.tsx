@@ -1368,7 +1368,9 @@ export default function HomePage() {
     bottom: 0,
     paddingTop: 10,
     paddingBottom: 10,
-    background: "white",
+background: "rgba(0,0,0,0.35)",
+backdropFilter: "blur(8px)",
+WebkitBackdropFilter: "blur(8px)",
     borderTop: "1px solid #eee",
     marginTop: 6,
   }}
