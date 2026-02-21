@@ -988,16 +988,23 @@ export default function HomePage() {
             padding: 14,
           }}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(720px, 96vw)",
-              borderRadius: 18,
-              border: "1px solid rgba(255,255,255,0.18)",
-              background: "white",
-              overflow: "hidden",
-            }}
-          >
+<div
+  onClick={(e) => e.stopPropagation()}
+  style={{
+    width: "min(720px, 96vw)",
+    borderRadius: 18,
+    border: "1px solid rgba(255,255,255,0.18)",
+    background: "white",
+
+    // ✅ make the panel fit the screen on phones
+    maxHeight: "calc(100dvh - 24px)",
+
+    // ✅ keep rounded corners while allowing inner scroll
+    overflow: "hidden",
+    display: "grid",
+    gridTemplateRows: "auto 1fr", // header + scroll area
+  }}
+>
             <div
               style={{
                 padding: 14,
@@ -1030,20 +1037,32 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div style={{ padding: 14, display: "grid", gap: 12 }}>
+            <div
+  style={{
+    padding: 14,
+    display: "grid",
+    gap: 12,
+
+    // ✅ this is the important part:
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+  }}
+>
               {/* Big logo on top inside overlay (nice on phones) */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/StreetLevelLogo-Punk.jpg"
-                alt="StreetLevel"
-                style={{
-                  width: "100%",
-                  height: "auto",
-                  borderRadius: 14,
-                  border: "1px solid #eee",
-                  display: "block",
-                }}
-              />
+ <img
+  src="/StreetLevelLogo-Punk.jpg"
+  alt="StreetLevel"
+  style={{
+    width: "100%",
+    height: "auto",
+    maxHeight: "32dvh", // ✅ key line
+    objectFit: "contain",
+    borderRadius: 14,
+    border: "1px solid #eee",
+    display: "block",
+  }}
+/>
 
               {/* WHAT / WHERE / WHO */}
               <div style={{ display: "grid", gap: 10 }}>
@@ -1398,23 +1417,35 @@ export default function HomePage() {
                 </div>
 
                 {/* GO */}
-                <button
-                  onClick={radioLetsGo}
-                  style={{
-                    marginTop: 6,
-                    padding: "14px 14px",
-                    borderRadius: 14,
-                    border: "1px solid #ddd",
-                    fontWeight: 950,
-                    background: "black",
-                    color: "#2bff00",
-                    cursor: "pointer",
-                    letterSpacing: 0.6,
-                  }}
-                  title="Start the radio with whatever you picked (or nothing!)"
-                >
-                  RADIO LETS GO
-                </button>
+ <div
+  style={{
+    position: "sticky",
+    bottom: 0,
+    paddingTop: 10,
+    paddingBottom: 10,
+    background: "white",
+    borderTop: "1px solid #eee",
+    marginTop: 6,
+  }}
+>
+  <button
+    onClick={radioLetsGo}
+    style={{
+      width: "100%",
+      padding: "14px 14px",
+      borderRadius: 14,
+      border: "1px solid #ddd",
+      fontWeight: 950,
+      background: "black",
+      color: "#2bff00",
+      cursor: "pointer",
+      letterSpacing: 0.6,
+    }}
+    title="Start the radio with whatever you picked (or nothing!)"
+  >
+    RADIO LETS GO
+  </button>
+</div>
 
                 <div style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.35 }}>
                   Tip: You can hit GO with <b>any</b> selection — genre only, city only, band name only… even nothing.
