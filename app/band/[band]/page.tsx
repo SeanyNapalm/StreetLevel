@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 import StreetLevelHeader from "../../components/StreetLevelHeader";
@@ -172,7 +172,12 @@ export default function BandDashboard({
   const [galleryLoading, setGalleryLoading] = useState(false);
 
   // --- Profile state ---
-  const [profileLoading, setProfileLoading] = useState(false);
+  // ✅ profile load sentinel (prevents bio gate from opening before we actually load profile)
+  const [profileReady, setProfileReady] = useState(false);
+
+  // (optional but nice) start as true so the gate can’t flash open on first paint
+  const [profileLoading, setProfileLoading] = useState(true);
+
   const [profileSaving, setProfileSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
@@ -184,10 +189,11 @@ export default function BandDashboard({
 
   const [profileCity, setProfileCity] = useState("Ottawa");
   const [profileBio, setProfileBio] = useState("");
-const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
 
-// ✅ Upload gate: require bio before uploads
-const [bioGateOpen, setBioGateOpen] = useState(false);
+
+
+
 
 const bioComplete = useMemo(() => {
   const nameOk = (profileName ?? "").trim().length >= 2;
@@ -195,7 +201,9 @@ const bioComplete = useMemo(() => {
   const countryOk = (profileCountry ?? "").trim().length >= 2;
   const provinceOk = (profileProvince ?? "").trim().length >= 2;
   const cityOk = (profileCity ?? "").trim().length >= 2;
-  const hoodOk = (profileNeighbourhood ?? "").trim().length >= 2;
+
+  const hood = (profileNeighbourhood ?? "").trim();
+  const hoodOk = hood.length === 0 || hood.length >= 2;
 
   const bioOk = (profileBio ?? "").trim().length >= 10;
 
@@ -208,6 +216,12 @@ const bioComplete = useMemo(() => {
   profileNeighbourhood,
   profileBio,
 ]);
+
+// ✅ If bio becomes complete at any time, slam the gate shut.
+
+
+// ✅ Open the gate only once per page-load, and ONLY after profile is ready.
+
 
   // --- NEXT SHOW (events MVP) ---
   const [showDate, setShowDate] = useState<string>("");
@@ -336,18 +350,28 @@ const bioComplete = useMemo(() => {
     setEvents((data ?? []) as EventRow[]);
     setEventsLoading(false);
   }
+// --- Load/save profile from band_users ---
 
-  // --- Load/save profile from band_users ---
-  async function loadProfile() {
-    if (!bandSlug) return;
+async function loadProfile() {
+  if (!bandSlug) return;
 
+  setProfileLoading(true);
+  setProfileReady(false);
+
+  // ✅ Only flip profileReady=true if we actually had an authed user to check with.
+  let didCheck = false;
+
+  try {
     const uid = await getAuthedUserId();
+
+    // ✅ Auth not hydrated yet — do NOT mark profileReady,
+    // otherwise the bio gate effect runs on defaults and opens the modal.
     if (!uid) {
-      setStatus("Not logged in.");
+      setStatus("Auth not ready yet (waiting for login)...");
       return;
     }
 
-    setProfileLoading(true);
+    didCheck = true;
 
     const { data, error } = await supabase
       .from("band_users")
@@ -356,118 +380,102 @@ const bioComplete = useMemo(() => {
       )
       .eq("band_slug", bandSlug)
       .eq("user_id", uid)
-      .single();
+      .maybeSingle();
 
     if (error) {
       setStatus(`Profile load error: ${error.message}`);
-      setProfileLoading(false);
       return;
     }
 
-    const row = data as BandUserProfileRow;
+    // If no row yet, keep defaults (bioComplete will be false and gate can open later).
+    if (data) {
+      const row = data as BandUserProfileRow;
 
-    const name = normSpaces(row.display_name ?? row.band_name ?? "");
-    const country = toTitleCaseSmart(row.country ?? "") || "Canada";
-    const province = toTitleCaseSmart(row.province ?? "") || "Ontario";
-    const city = toTitleCaseSmart(row.city ?? "") || "Ottawa";
-        const neighbourhood = toTitleCaseSmart(row.neighbourhood ?? "Centre Town");
-    const bio = row.bio ?? "";
-    const av = row.avatar_path ?? null;
+      const name = normSpaces(row.display_name ?? row.band_name ?? "");
+      const country = toTitleCaseSmart(row.country ?? "") || "Canada";
+      const province = toTitleCaseSmart(row.province ?? "") || "Ontario";
+      const city = toTitleCaseSmart(row.city ?? "") || "Ottawa";
+      const neighbourhood = toTitleCaseSmart(row.neighbourhood ?? "") || "";
+      const bio = row.bio ?? "";
+      const av = row.avatar_path ?? null;
 
-    setProfileName(name);
-    setProfileCountry(country);
-    setProfileProvince(province);
-    setProfileCity(city);
-    setProfileNeighbourhood(neighbourhood);
-    setProfileBio(bio);
-    setAvatarPath(av);
+      setProfileName(name);
+      setProfileCountry(country);
+      setProfileProvince(province);
+      setProfileCity(city);
+      setProfileNeighbourhood(neighbourhood);
+      setProfileBio(bio);
+      setAvatarPath(av);
 
-    setDisplayName((prev) => prev || name);
-
+      setDisplayName((prev) => prev || name);
+    }
+} finally {
     setProfileLoading(false);
+
+    if (didCheck) {
+      setTimeout(() => setProfileReady(true), 0);
+    } else {
+      setProfileReady(false);
+    }
+  }
+} // ✅ CLOSE loadProfile()
+
+ async function saveProfile() {
+  if (!bandSlug) return;
+
+  const uid = await getAuthedUserId();
+  if (!uid) {
+    setStatus("Not logged in.");
+    return;
   }
 
-  async function saveProfile() {
-    if (!bandSlug) return;
+  const cleanName = normSpaces(profileName);
 
-    const uid = await getAuthedUserId();
-    if (!uid) {
-      setStatus("Not logged in.");
-      return;
-    }
+  const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
+  const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
+  const cleanNeighbourhood = toTitleCaseSmart(profileNeighbourhood);
 
-    const cleanName = normSpaces(profileName);
+  const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
+  const cleanBio = normSpaces(profileBio);
 
-    const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
-    const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
-    const cleanNeighbourhood = toTitleCaseSmart(profileNeighbourhood);
+  setProfileSaving(true);
+  setStatus("Saving profile...");
 
-    const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
-    const cleanBio = normSpaces(profileBio);
+  const payload = {
+    user_id: uid,
+    band_slug: bandSlug,
+    band_name: cleanName || bandSlug,
+    display_name: cleanName,
+    country: cleanCountry,
+    province: cleanProvince,
+    neighbourhood: cleanNeighbourhood || null,
+    city: cleanCity,
+    bio: cleanBio,
+    avatar_path: avatarPath,
+  };
 
-    setProfileSaving(true);
-    setStatus("Saving profile...");
+  const { error } = await supabase
+    .from("band_users")
+    .upsert(payload, { onConflict: "user_id,band_slug" });
 
-    const upd = await supabase
-      .from("band_users")
-      .update({
-        display_name: cleanName,
-        country: cleanCountry,
-        province: cleanProvince,
-        neighbourhood: cleanNeighbourhood || null,
-        city: cleanCity,
-        bio: cleanBio,
-        avatar_path: avatarPath,
-      })
-      .eq("band_slug", bandSlug)
-      .eq("user_id", uid);
-
-    if (upd.error) {
-      setStatus(`Profile save error: ${upd.error.message}`);
-      setProfileSaving(false);
-      return;
-    }
-
-    // If update didn't match any row, insert
-    const check = await supabase
-      .from("band_users")
-      .select("user_id")
-      .eq("band_slug", bandSlug)
-      .eq("user_id", uid)
-      .maybeSingle();
-
-    if (!check.error && !check.data) {
-      const ins = await supabase.from("band_users").insert({
-        user_id: uid,
-        band_slug: bandSlug,
-        band_name: cleanName || bandSlug,
-        display_name: cleanName,
-        country: cleanCountry,
-        province: cleanProvince,
-        neighbourhood: cleanNeighbourhood || null,
-        city: cleanCity,
-        bio: cleanBio,
-        avatar_path: avatarPath,
-      });
-
-      if (ins.error) {
-        setStatus(`Profile insert error: ${ins.error.message}`);
-        setProfileSaving(false);
-        return;
-      }
-    }
-
-    setProfileName(cleanName);
-    setProfileCountry(cleanCountry);
-    setProfileProvince(cleanProvince);
-    setProfileNeighbourhood(cleanNeighbourhood);
-    setProfileCity(cleanCity);
-    setProfileBio(cleanBio);
-
-    setStatus("Profile saved.");
-    setTimeout(() => setStatus(""), 1200);
+  if (error) {
+    setStatus(`Profile save error: ${error.message}`);
     setProfileSaving(false);
+    return;
   }
+
+  // Update local state to normalized versions
+  setProfileName(cleanName);
+  setProfileCountry(cleanCountry);
+  setProfileProvince(cleanProvince);
+  setProfileNeighbourhood(cleanNeighbourhood);
+  setProfileCity(cleanCity);
+  setProfileBio(cleanBio);
+
+  setStatus("Profile saved.");
+  setTimeout(() => setStatus(""), 1200);
+  setProfileSaving(false);
+}
 
   async function uploadAvatar(file: File) {
     if (!bandSlug) {
@@ -968,6 +976,21 @@ const bioComplete = useMemo(() => {
   }
 
 useEffect(() => {
+  const { data } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      loadProfile();
+      loadGallery();
+      refreshTracks();
+      loadEvents();
+    }
+  });
+
+  return () => data.subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [bandSlug]);
+
+
+useEffect(() => {
   const url = new URL(window.location.href);
   const n = url.searchParams.get("name");
   if (n) setDisplayName(n);
@@ -979,15 +1002,7 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [bandSlug]);
 
-// ✅ If profile is missing required bio fields, force the bio modal open
-useEffect(() => {
-  // only after profile loads (otherwise it flashes open)
-  if (profileLoading) return;
 
-  // Only FORCE it open if incomplete.
-  // Do NOT auto-close it when it becomes complete — let the Save button do that.
-  if (!bioComplete) setBioGateOpen(true);
-}, [profileLoading, bioComplete]);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -1695,12 +1710,7 @@ lineHeight: 1.25,
       ? "Complete your band bio before uploading songs."
       : "Upload an audio file"
   }
-  onClick={(e) => {
-    if (!bioComplete) {
-      e.preventDefault();
-      setBioGateOpen(true);
-    }
-  }}
+
 >
   Upload audio
   <input
@@ -1713,10 +1723,7 @@ lineHeight: 1.25,
       e.currentTarget.value = "";
       if (!f) return;
 
-      if (!bioComplete) {
-        setBioGateOpen(true);
-        return;
-      }
+
 
       onUpload(f);
     }}
@@ -2081,172 +2088,7 @@ lineHeight: 1.25,
         </aside>
       </div>
 
-{/* BIO GATE MODAL (force band to fill bio before uploads) */}
-{bioGateOpen ? (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.72)",
-      display: "grid",
-      placeItems: "center",
-      zIndex: 9998,
-      padding: 18,
-    }}
-  >
-    <div
-      style={{
-        width: "min(720px, 96vw)",
-        borderRadius: 18,
-        border: "1px solid rgba(255,255,255,0.15)",
-        background: "rgba(0,0,0,0.35)",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          padding: 14,
-          borderBottom: "1px solid rgba(255,255,255,0.12)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <div style={{ color: "white", fontWeight: 950, letterSpacing: 0.6 }}>
-          Complete your Band Bio to Upload Songs
-        </div>
 
-        {/* No close button: this is a “gate”. If you want an escape hatch, tell me and we’ll add it. */}
-      </div>
-
-      <div style={{ padding: 14, display: "grid", gap: 10 }}>
-        <div style={{ color: "white", fontSize: 12, opacity: 0.85, lineHeight: 1.35 }}>
-          Quick setup — this info is used to tag your tracks so listeners can filter by location.
-        </div>
-<input
-  value={profileName}
-  onChange={(e) => setProfileName(e.target.value)}
-  placeholder="Band name"
-  style={{
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.25)",
-    background: "rgba(0,0,0,0.25)",
-    color: "white",
-  }}
-/>
-
-<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-  <input
-    value={profileCountry}
-    onChange={(e) => setProfileCountry(e.target.value)}
-    placeholder="Country"
-    style={{
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid rgba(255,255,255,0.25)",
-      background: "rgba(0,0,0,0.25)",
-      color: "white",
-    }}
-  />
-
-  <input
-    value={profileProvince}
-    onChange={(e) => setProfileProvince(e.target.value)}
-    placeholder="Province / State"
-    style={{
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid rgba(255,255,255,0.25)",
-      background: "rgba(0,0,0,0.25)",
-      color: "white",
-    }}
-  />
-</div>
-
-<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-  <input
-    value={profileCity}
-    onChange={(e) => setProfileCity(e.target.value)}
-    placeholder="City"
-    style={{
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid rgba(255,255,255,0.25)",
-      background: "rgba(0,0,0,0.25)",
-      color: "white",
-    }}
-  />
-
-  <input
-    value={profileNeighbourhood}
-    onChange={(e) => setProfileNeighbourhood(e.target.value)}
-    placeholder="Neighbourhood"
-    style={{
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid rgba(255,255,255,0.25)",
-      background: "rgba(0,0,0,0.25)",
-      color: "white",
-    }}
-  />
-</div>
-        <textarea
-          value={profileBio}
-          onChange={(e) => setProfileBio(e.target.value)}
-          placeholder="Describe yourself!"
-          style={{
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.25)",
-            background: "rgba(0,0,0,0.25)",
-            color: "white",
-            minHeight: 110,
-            resize: "vertical",
-          }}
-        />
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            onClick={async () => {
-              await saveProfile();
-              // saveProfile normalizes + saves; after state updates, this will close via the effect
-              // but we can also nudge it instantly:
-if (
-  (profileName ?? "").trim().length >= 2 &&
-  (profileCountry ?? "").trim().length >= 2 &&
-  (profileProvince ?? "").trim().length >= 2 &&
-  (profileCity ?? "").trim().length >= 2 &&
-  (profileNeighbourhood ?? "").trim().length >= 2 &&
-  (profileBio ?? "").trim().length >= 5
-) {
-  setBioGateOpen(false);
-}
-            }}
-            disabled={profileSaving || profileLoading}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.25)",
-              background: "black",
-              color: "#2bff00",
-              fontWeight: 950,
-              opacity: profileSaving || profileLoading ? 0.55 : 1,
-              cursor: profileSaving || profileLoading ? "not-allowed" : "pointer",
-            }}
-          >
-            {profileSaving ? "Saving..." : "Save Bio & Continue"}
-          </button>
-
-<div style={{ color: "white", fontSize: 12, opacity: 0.75 }}>
-  Required: band name, country, province/state, city, neighbourhood, bio (10+ chars)
-</div>
-        </div>
-      </div>
-    </div>
-  </div>
-) : null}
 
       {/* LIGHTBOX MODAL (Dashboard Gallery) */}
       {lightboxOpen && activePhoto ? (
