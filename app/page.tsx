@@ -1394,7 +1394,7 @@ WebkitBackdropFilter: "blur(8px)",
   </button>
 </div>
 
-                <div style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.35 }}>
+                <div style={{ fontSize: 12, color: "white", opacity: 0.7, lineHeight: 1.35 }}>
                   Tip: You can hit GO with <b>any</b> selection — genre only, city only, band name only… even nothing.
                 </div>
               </div>
