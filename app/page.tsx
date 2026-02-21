@@ -633,7 +633,7 @@ export default function HomePage() {
 
   const overlayTitle = useMemo(() => {
     if (date) return "Event Radio";
-    return "Tune Radio";
+    return "Street Level - Radio Tuner";
   }, [date]);
 
   // =========================
@@ -667,39 +667,14 @@ export default function HomePage() {
               alt="StreetLevel"
               style={{
                 width: "100%",
-                height: "auto",
+                height: "auto%",
                 borderRadius: 18,
                 border: "1px solid #eee",
                 display: "block",
               }}
             />
 
-            <div style={{ marginTop: 14, fontWeight: 950, letterSpacing: 0.6 }}>
-              StreetLevel Radio
-            </div>
-            <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7, lineHeight: 1.35 }}>
-              Pick <b>What</b>, <b>Where</b>, <b>Who</b> — or just hit <b>RADIO LETS GO</b>.
-            </div>
 
-            <button
-              onClick={() => setFiltersOpen(true)}
-              style={{
-                marginTop: 14,
-                padding: "12px 16px",
-                borderRadius: 14,
-                border: "1px solid #ddd",
-                fontWeight: 950,
-                background: "black",
-                color: "#2bff00",
-                cursor: "pointer",
-              }}
-            >
-              TUNE RADIO
-            </button>
-
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.6 }}>
-              (Portrait mode friendly. One thumb. No chaos.)
-            </div>
           </div>
         </div>
       ) : null}
@@ -993,16 +968,11 @@ export default function HomePage() {
   style={{
     width: "min(720px, 96vw)",
     borderRadius: 18,
-    border: "1px solid rgba(255,255,255,0.18)",
-    background: "white",
-
-    // ✅ make the panel fit the screen on phones
-    maxHeight: "calc(100dvh - 24px)",
-
-    // ✅ keep rounded corners while allowing inner scroll
+    border: "1px solid rgba(255, 255, 255, 0.34)",
+    background: "rgba(255,255,255,0.10)", // 👈 translucent
+    backdropFilter: "blur(8px)",          // 👈 glass effect (supported browsers)
+    WebkitBackdropFilter: "blur(8px)",     // 👈 Safari
     overflow: "hidden",
-    display: "grid",
-    gridTemplateRows: "auto 1fr", // header + scroll area
   }}
 >
             <div
@@ -1015,7 +985,7 @@ export default function HomePage() {
                 borderBottom: "1px solid #eee",
               }}
             >
-              <div style={{ fontWeight: 950, letterSpacing: 0.6 }}>{overlayTitle}</div>
+              <div style={{ fontWeight: 950, color: "white", letterSpacing: 0.6 }}>{overlayTitle}</div>
 
               <div style={{ display: "flex", gap: 8 }}>
                 {hasStarted ? (
@@ -1050,25 +1020,13 @@ export default function HomePage() {
 >
               {/* Big logo on top inside overlay (nice on phones) */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
- <img
-  src="/StreetLevelLogo-Punk.jpg"
-  alt="StreetLevel"
-  style={{
-    width: "100%",
-    height: "auto",
-    maxHeight: "32dvh", // ✅ key line
-    objectFit: "contain",
-    borderRadius: 14,
-    border: "1px solid #eee",
-    display: "block",
-  }}
-/>
+
 
               {/* WHAT / WHERE / WHO */}
               <div style={{ display: "grid", gap: 10 }}>
                 {/* WHAT */}
                 <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 0.7 }}>WHAT (genre)</div>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>What Genre?:)</div>
                   <select
                     value={genre}
                     onChange={(e) => setGenre(e.target.value)}
@@ -1077,7 +1035,7 @@ export default function HomePage() {
                       borderRadius: 12,
                       border: "1px solid #ddd",
                       fontWeight: 800,
-                    }}
+                     }}
                   >
                     {(genreOptions.length ? genreOptions : [""]).map((g) => (
                       <option key={g || "any"} value={g}>
@@ -1089,7 +1047,7 @@ export default function HomePage() {
 
                 {/* WHERE */}
                 <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 0.7 }}>WHERE</div>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>From Where?:</div>
 
                   {/* Breadcrumb */}
                   {prettyBreadcrumb.length ? (
@@ -1159,7 +1117,7 @@ export default function HomePage() {
                       </button>
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, opacity: 0.65 }}>
+                    <div style={{ fontSize: 12, color: "white", opacity: 0.65 }}>
                       Optional. Pick country/province/city/neighbourhood… or leave blank.
                     </div>
                   )}
@@ -1375,7 +1333,7 @@ export default function HomePage() {
 
                 {/* WHO */}
                 <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 0.7 }}>WHO (band name / song)</div>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>Who?: search for specific band/song/event:</div>
                   <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
@@ -1391,22 +1349,9 @@ export default function HomePage() {
 
                 {/* Date + Offline (extras) */}
                 <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: 0.7 }}>EVENT DATE (optional)</div>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      style={{
-                        padding: "12px 12px",
-                        borderRadius: 12,
-                        border: "1px solid #ddd",
-                        fontWeight: 800,
-                      }}
-                    />
-                  </div>
+     
 
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 900 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, color: "white", fontWeight: 900 }}>
                     <input
                       type="checkbox"
                       checked={offlineMode}
