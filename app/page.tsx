@@ -138,6 +138,7 @@ const NEIGHBOURHOODS_BY_CITY: Record<string, string[]> = {
 type WhereStep = "country" | "province" | "city" | "neighbourhood";
 
 export default function HomePage() {
+  
   const [status, setStatus] = useState("");
 
   // WHO
@@ -161,8 +162,11 @@ export default function HomePage() {
   const [eventGenreOptions, setEventGenreOptions] = useState<string[]>([]);
   const [eventCityOptions, setEventCityOptions] = useState<string[]>([]);
 
-  const [tracks, setTracks] = useState<TrackView[]>([]);
+ const [tracks, setTracks] = useState<TrackView[]>([]);
   const [pendingFreshRound, setPendingFreshRound] = useState(false);
+
+  // ✅ keep a stable list of genres we've seen so the dropdown never "shrinks"
+  const [masterGenres, setMasterGenres] = useState<string[]>([]);
 
   // Playback
   const [queue, setQueue] = useState<TrackView[]>([]);
@@ -378,6 +382,17 @@ export default function HomePage() {
     }));
 
     setTracks(mapped);
+
+    // ✅ merge any newly-seen genres into a stable list
+    setMasterGenres((prev) => {
+      const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
+      for (const t of mapped) {
+        const g = norm(t.genre);
+        if (g) s.add(g);
+      }
+      return Array.from(s).sort((a, b) => a.localeCompare(b));
+    });
+
     setStatus(mapped.length ? "" : "No radio tracks yet.");
   }
 
@@ -389,15 +404,18 @@ export default function HomePage() {
   }, [date, country, province, city, neighbourhood, genre, q, offlineMode]);
 
   // ============== OPTIONS ==============
-  const genreOptions = useMemo(() => {
+    const genreOptions = useMemo(() => {
     if (date) return ["", ...eventGenreOptions];
-    const set = new Set<string>();
-    for (const t of tracks) {
-      const g = norm(t.genre);
-      if (g) set.add(g);
-    }
-    return ["", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-  }, [date, eventGenreOptions, tracks]);
+
+    // ✅ use stable list so options don't disappear due to randomness
+    const s = new Set(masterGenres.map((x) => norm(x)).filter(Boolean));
+
+    // keep current selection visible (even if not yet in masterGenres)
+    const current = norm(genre);
+    if (current) s.add(current);
+
+    return ["", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
+  }, [date, eventGenreOptions, masterGenres, genre]);
 
   // For event mode, city options are event-based; otherwise we’ll use our hardcoded progressive UI.
   const cityOptions = useMemo(() => {
