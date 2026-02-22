@@ -315,7 +315,7 @@ useEffect(() => {
   return (
     <main
       style={{
-        padding: 44,
+        padding: 18,
         fontFamily: "sans-serif",
         maxWidth: 1100,
         margin: "0 auto",
@@ -380,15 +380,8 @@ useEffect(() => {
       {status ? <div style={{ marginTop: 10, opacity: 0.8 }}>{status}</div> : null}
 
       {/* ===== TOP ROW: BIO (left) + TRACKS (right) ===== */}
-      <div
-        style={{
-          marginTop: 18,
-          display: "grid",
-          gridTemplateColumns: "1fr 1.4fr",
-          gap: 14,
-          alignItems: "start",
-        }}
-      >
+      {/* ===== VERTICAL STACK ===== */}
+      <div style={{ marginTop: 18, display: "grid", gap: 14 }}>
         {/* BIO */}
         <section
           style={{
@@ -626,16 +619,8 @@ useEffect(() => {
 
 
 
-      {/* ===== BOTTOM ROW: UPCOMING SHOWS (left) + MERCH (right) ===== */}
-      <div
-        style={{
-          marginTop: 14,
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 14,
-          alignItems: "start",
-        }}
-      >
+      {/* ===== MORE VERTICAL STACK ===== */}
+      <div style={{ marginTop: 14, display: "grid", gap: 14 }}>
         {/* UPCOMING SHOWS */}
         <section>
           <div
