@@ -787,81 +787,102 @@ export default function HomePage() {
             >
               {/* LEFT: Now Playing */}
               <div>
-                {nowPlaying ? (
-                  <Link href={`/b/${nowPlaying.band_slug}`} style={{ textDecoration: "none", color: "inherit" }}>
-                    <section
-                      style={{
-                        border: "1px solid #eee",
-                        borderRadius: 18,
-                        padding: 14,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
-                        NOW PLAYING
-                      </div>
+{nowPlaying ? (
+  <section
+    style={{
+      border: "1px solid #eee",
+      borderRadius: 18,
+      padding: 14,
+    }}
+  >
+    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>NOW PLAYING</div>
 
-                      <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-                        <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1.1 }}>{nowPlaying.title}</div>
+    <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+      {/* Title + open band link */}
+      <div style={{ display: "grid", gap: 6 }}>
+        <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1.1 }}>{nowPlaying.title}</div>
 
-                        <div style={{ fontSize: 12, opacity: 0.75 }}>
-                          {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")} • {(nowPlaying.band_slug || "—")}
-                        </div>
+        <div style={{ fontSize: 12, opacity: 0.75 }}>
+          {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")} • {(nowPlaying.band_slug || "—")}
+        </div>
 
-                        {nowPlaying.url ? (
-                          <audio
-                            ref={audioRef}
-                            key={nowPlaying.id}
-                            controls
-                            autoPlay
-                            src={nowPlaying.url}
-                            style={{ width: "100%" }}
-                            onEnded={onEndedAdvance}
-                            onPlay={() => setAutoplayBlocked(false)}
-                          />
-                        ) : null}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <Link
+            href={`/b/${nowPlaying.band_slug}`}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              textDecoration: "none",
+              fontWeight: 950,
+              background: "black",
+              color: "white",
+              display: "inline-block",
+            }}
+            title="Open band page"
+          >
+            Open Band Page →
+          </Link>
+        </div>
+      </div>
 
-                        {autoplayBlocked ? (
-                          <div style={{ fontSize: 12, opacity: 0.75 }}>
-                            Autoplay was blocked by the browser — click <b>Play</b> once to start.
-                          </div>
-                        ) : null}
+      {/* Audio controls (never navigates now) */}
+      {nowPlaying.url ? (
+        <div style={{ paddingTop: 6 }}>
+          <audio
+            ref={audioRef}
+            key={nowPlaying.id}
+            controls
+            autoPlay
+            src={nowPlaying.url}
+            style={{
+              width: "100%",
+              height: 46, // makes the control bar a bit more thumb-friendly on mobile
+            }}
+            onEnded={onEndedAdvance}
+            onPlay={() => setAutoplayBlocked(false)}
+          />
+        </div>
+      ) : null}
 
-                        {(eventMode ? nowPlaying.flyerUrl : nowPlaying.artUrl) ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={(eventMode ? nowPlaying.flyerUrl : nowPlaying.artUrl) as string}
-                            alt="Now playing artwork"
-                            style={{
-                              width: "100%",
-                              aspectRatio: "1 / 1",
-                              objectFit: "cover",
-                              borderRadius: 16,
-                              border: "1px solid #eee",
-                              marginTop: 8,
-                            }}
-                          />
-                        ) : null}
-                      </div>
-                    </section>
-                  </Link>
-                ) : (
-                  <section
-                    style={{
-                      border: "1px solid #eee",
-                      borderRadius: 18,
-                      padding: 14,
-                    }}
-                  >
-                    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>NOW PLAYING</div>
-                    <div style={{ marginTop: 10, fontWeight: 950, lineHeight: 1.2 }}>
-                      Nothing playing yet.
-                    </div>
-                    <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>
-                      Hit <b>Play / Next</b> or open <b>Filters</b> and smash <b>RADIO LETS GO</b>.
-                    </div>
-                  </section>
-                )}
+      {autoplayBlocked ? (
+        <div style={{ fontSize: 12, opacity: 0.75 }}>
+          Autoplay was blocked by the browser — click <b>Play</b> once to start.
+        </div>
+      ) : null}
+
+      {(eventMode ? nowPlaying.flyerUrl : nowPlaying.artUrl) ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={(eventMode ? nowPlaying.flyerUrl : nowPlaying.artUrl) as string}
+          alt="Now playing artwork"
+          style={{
+            width: "100%",
+            aspectRatio: "1 / 1",
+            objectFit: "cover",
+            borderRadius: 16,
+            border: "1px solid #eee",
+            marginTop: 8,
+          }}
+        />
+      ) : null}
+    </div>
+  </section>
+) : (
+  <section
+    style={{
+      border: "1px solid #eee",
+      borderRadius: 18,
+      padding: 14,
+    }}
+  >
+    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>NOW PLAYING</div>
+    <div style={{ marginTop: 10, fontWeight: 950, lineHeight: 1.2 }}>Nothing playing yet.</div>
+    <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>
+      Hit <b>Play / Next</b> or open <b>Filters</b> and smash <b>RADIO LETS GO</b>.
+    </div>
+  </section>
+)}
               </div>
 
               {/* RIGHT: Queue */}

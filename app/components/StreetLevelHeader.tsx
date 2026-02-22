@@ -40,7 +40,7 @@ export default function StreetLevelHeader({
           priority
           style={{
             borderRadius: 14,
-            border: "1px solid #eee",
+
             maxWidth: "80vw",
             height: "auto",
           }}
