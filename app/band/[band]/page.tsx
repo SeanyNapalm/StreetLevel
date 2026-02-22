@@ -1021,7 +1021,7 @@ useEffect(() => {
   return (
     <main
       style={{
-        padding: 44,
+        padding: 18,
         fontFamily: "sans-serif",
         maxWidth: 1000,
         margin: "0 auto",
@@ -1072,12 +1072,11 @@ useEffect(() => {
         }
       />
 
-      {/* PROFILE ROW */}
+      {/* PROFILE STACK */}
       <div
         style={{
           marginTop: 8,
           display: "grid",
-          gridTemplateColumns: "1fr 380px",
           gap: 14,
           alignItems: "start",
         }}
@@ -1436,7 +1435,6 @@ useEffect(() => {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1.2fr 0.8fr",
             gap: 14,
             alignItems: "start",
           }}
@@ -1666,12 +1664,11 @@ lineHeight: 1.25,
         </div>
       </section>
 
-      {/* MAIN DASHBOARD LAYOUT: Left = Tracks, Right = Merch */}
+      {/* MAIN DASHBOARD STACK: Tracks then Merch */}
       <div
         style={{
           marginTop: 18,
           display: "grid",
-          gridTemplateColumns: "1fr 380px",
           gap: 14,
           alignItems: "start",
         }}
