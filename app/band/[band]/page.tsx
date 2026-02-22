@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabaseClient";
 import StreetLevelHeader from "../../components/StreetLevelHeader";
@@ -105,20 +105,7 @@ function toTitleCaseSmart(input: string) {
   const s = normSpaces(input).toLowerCase();
   if (!s) return "";
 
-  const minor = new Set([
-    "and",
-    "or",
-    "the",
-    "a",
-    "an",
-    "of",
-    "to",
-    "in",
-    "on",
-    "at",
-    "for",
-    "with",
-  ]);
+  const minor = new Set(["and", "or", "the", "a", "an", "of", "to", "in", "on", "at", "for", "with"]);
 
   return s
     .split(" ")
@@ -138,11 +125,7 @@ function safeFileName(name: string) {
   return (name || "file").replace(/[^a-zA-Z0-9._-]+/g, "_");
 }
 
-export default function BandDashboard({
-  params,
-}: {
-  params: Promise<{ band: string }>;
-}) {
+export default function BandDashboard({ params }: { params: Promise<{ band: string }> }) {
   const router = useRouter();
   const p = use(params);
   const bandSlug = (p?.band ?? "").trim();
@@ -153,10 +136,10 @@ export default function BandDashboard({
   const [eventStatus, setEventStatus] = useState<string>("");
   const [uploading, setUploading] = useState(false);
 
-  // Track editing (ONLY: title, price, radio, artwork)
+  // Track editing (ONLY: title, price, radio, artwork, genre)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editGenre, setEditGenre] = useState(""); // ✅ NEW
+  const [editGenre, setEditGenre] = useState("");
   const [editRadio, setEditRadio] = useState(true);
   const [editPrice, setEditPrice] = useState("1.00");
 
@@ -172,56 +155,33 @@ export default function BandDashboard({
   const [galleryLoading, setGalleryLoading] = useState(false);
 
   // --- Profile state ---
-  // ✅ profile load sentinel (prevents bio gate from opening before we actually load profile)
   const [profileReady, setProfileReady] = useState(false);
-
-  // (optional but nice) start as true so the gate can’t flash open on first paint
   const [profileLoading, setProfileLoading] = useState(true);
-
   const [profileSaving, setProfileSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [profileName, setProfileName] = useState("");
-
   const [profileCountry, setProfileCountry] = useState("Canada");
   const [profileProvince, setProfileProvince] = useState("Ontario");
   const [profileNeighbourhood, setProfileNeighbourhood] = useState("");
-
   const [profileCity, setProfileCity] = useState("Ottawa");
   const [profileBio, setProfileBio] = useState("");
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
 
+  const bioComplete = useMemo(() => {
+    const nameOk = (profileName ?? "").trim().length >= 2;
 
+    const countryOk = (profileCountry ?? "").trim().length >= 2;
+    const provinceOk = (profileProvince ?? "").trim().length >= 2;
+    const cityOk = (profileCity ?? "").trim().length >= 2;
 
+    const hood = (profileNeighbourhood ?? "").trim();
+    const hoodOk = hood.length === 0 || hood.length >= 2;
 
+    const bioOk = (profileBio ?? "").trim().length >= 10;
 
-const bioComplete = useMemo(() => {
-  const nameOk = (profileName ?? "").trim().length >= 2;
-
-  const countryOk = (profileCountry ?? "").trim().length >= 2;
-  const provinceOk = (profileProvince ?? "").trim().length >= 2;
-  const cityOk = (profileCity ?? "").trim().length >= 2;
-
-  const hood = (profileNeighbourhood ?? "").trim();
-  const hoodOk = hood.length === 0 || hood.length >= 2;
-
-  const bioOk = (profileBio ?? "").trim().length >= 10;
-
-  return nameOk && countryOk && provinceOk && cityOk && hoodOk && bioOk;
-}, [
-  profileName,
-  profileCountry,
-  profileProvince,
-  profileCity,
-  profileNeighbourhood,
-  profileBio,
-]);
-
-// ✅ If bio becomes complete at any time, slam the gate shut.
-
-
-// ✅ Open the gate only once per page-load, and ONLY after profile is ready.
-
+    return nameOk && countryOk && provinceOk && cityOk && hoodOk && bioOk;
+  }, [profileName, profileCountry, profileProvince, profileCity, profileNeighbourhood, profileBio]);
 
   // --- NEXT SHOW (events MVP) ---
   const [showDate, setShowDate] = useState<string>("");
@@ -243,27 +203,15 @@ const bioComplete = useMemo(() => {
   };
   const closeLightbox = () => setLightboxOpen(false);
 
-  const prevPhoto = () =>
-    setLightboxIndex((i) => (i - 1 + gallery.length) % gallery.length);
-  const nextPhoto = () =>
-    setLightboxIndex((i) => (i + 1) % gallery.length);
+  const prevPhoto = () => setLightboxIndex((i) => (i - 1 + gallery.length) % gallery.length);
+  const nextPhoto = () => setLightboxIndex((i) => (i + 1) % gallery.length);
 
   const activePhoto = gallery[lightboxIndex];
 
-  const prettyBand = useMemo(
-    () => displayName || profileName || bandSlug || "Band",
-    [displayName, profileName, bandSlug]
-  );
+  const prettyBand = useMemo(() => displayName || profileName || bandSlug || "Band", [displayName, profileName, bandSlug]);
 
-  const avatarUrl = useMemo(
-    () => withCacheBust(getAvatarUrl(avatarPath)),
-    [avatarPath]
-  );
-
-  const flyerUrl = useMemo(
-    () => (flyerPath ? withCacheBust(getFlyerUrl(flyerPath)) : ""),
-    [flyerPath]
-  );
+  const avatarUrl = useMemo(() => withCacheBust(getAvatarUrl(avatarPath)), [avatarPath]);
+  const flyerUrl = useMemo(() => (flyerPath ? withCacheBust(getFlyerUrl(flyerPath)) : ""), [flyerPath]);
 
   // default event track picker to first track
   useEffect(() => {
@@ -303,9 +251,7 @@ const bioComplete = useMemo(() => {
     setStatus("Loading tracks...");
     const { data, error } = await supabase
       .from("tracks")
-      .select(
-        "id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,price_cents,created_at"
-      )
+      .select("id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,price_cents,created_at")
       .eq("band_slug", bandSlug)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
@@ -350,132 +296,122 @@ const bioComplete = useMemo(() => {
     setEvents((data ?? []) as EventRow[]);
     setEventsLoading(false);
   }
-// --- Load/save profile from band_users ---
 
-async function loadProfile() {
-  if (!bandSlug) return;
+  // --- Load profile from band_users ---
+  async function loadProfile() {
+    if (!bandSlug) return;
 
-  setProfileLoading(true);
-  setProfileReady(false);
+    setProfileLoading(true);
+    setProfileReady(false);
 
-  // ✅ Only flip profileReady=true if we actually had an authed user to check with.
-  let didCheck = false;
+    let didCheck = false;
 
-  try {
+    try {
+      const uid = await getAuthedUserId();
+
+      if (!uid) {
+        setStatus("Auth not ready yet (waiting for login)...");
+        return;
+      }
+
+      didCheck = true;
+
+      const { data, error } = await supabase
+        .from("band_users")
+        .select("user_id, band_slug, band_name, display_name, country, province, neighbourhood, city, bio, avatar_path")
+        .eq("band_slug", bandSlug)
+        .eq("user_id", uid)
+        .maybeSingle();
+
+      if (error) {
+        setStatus(`Profile load error: ${error.message}`);
+        return;
+      }
+
+      if (data) {
+        const row = data as BandUserProfileRow;
+
+        const name = normSpaces(row.display_name ?? row.band_name ?? "");
+        const country = toTitleCaseSmart(row.country ?? "") || "Canada";
+        const province = toTitleCaseSmart(row.province ?? "") || "Ontario";
+        const city = toTitleCaseSmart(row.city ?? "") || "Ottawa";
+        const neighbourhood = toTitleCaseSmart(row.neighbourhood ?? "") || "";
+        const bio = row.bio ?? "";
+        const av = row.avatar_path ?? null;
+
+        setProfileName(name);
+        setProfileCountry(country);
+        setProfileProvince(province);
+        setProfileCity(city);
+        setProfileNeighbourhood(neighbourhood);
+        setProfileBio(bio);
+        setAvatarPath(av);
+
+        setDisplayName((prev) => prev || name);
+      }
+    } finally {
+      setProfileLoading(false);
+      if (didCheck) {
+        setTimeout(() => setProfileReady(true), 0);
+      } else {
+        setProfileReady(false);
+      }
+    }
+  }
+
+  async function saveProfile() {
+    if (!bandSlug) return;
+
     const uid = await getAuthedUserId();
-
-    // ✅ Auth not hydrated yet — do NOT mark profileReady,
-    // otherwise the bio gate effect runs on defaults and opens the modal.
     if (!uid) {
-      setStatus("Auth not ready yet (waiting for login)...");
+      setStatus("Not logged in.");
       return;
     }
 
-    didCheck = true;
+    const cleanName = normSpaces(profileName);
 
-    const { data, error } = await supabase
-      .from("band_users")
-      .select(
-        "user_id, band_slug, band_name, display_name, country, province, neighbourhood, city, bio, avatar_path"
-      )
-      .eq("band_slug", bandSlug)
-      .eq("user_id", uid)
-      .maybeSingle();
+    const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
+    const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
+    const cleanNeighbourhood = toTitleCaseSmart(profileNeighbourhood);
+
+    const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
+    const cleanBio = normSpaces(profileBio);
+
+    setProfileSaving(true);
+    setStatus("Saving profile...");
+
+    const payload = {
+      user_id: uid,
+      band_slug: bandSlug,
+      band_name: cleanName || bandSlug,
+      display_name: cleanName,
+      country: cleanCountry,
+      province: cleanProvince,
+      neighbourhood: cleanNeighbourhood || null,
+      city: cleanCity,
+      bio: cleanBio,
+      avatar_path: avatarPath,
+    };
+
+    const { error } = await supabase.from("band_users").upsert(payload, { onConflict: "user_id,band_slug" });
 
     if (error) {
-      setStatus(`Profile load error: ${error.message}`);
+      setStatus(`Profile save error: ${error.message}`);
+      setProfileSaving(false);
       return;
     }
 
-    // If no row yet, keep defaults (bioComplete will be false and gate can open later).
-    if (data) {
-      const row = data as BandUserProfileRow;
+    setProfileName(cleanName);
+    setProfileCountry(cleanCountry);
+    setProfileProvince(cleanProvince);
+    setProfileNeighbourhood(cleanNeighbourhood);
+    setProfileCity(cleanCity);
+    setProfileBio(cleanBio);
 
-      const name = normSpaces(row.display_name ?? row.band_name ?? "");
-      const country = toTitleCaseSmart(row.country ?? "") || "Canada";
-      const province = toTitleCaseSmart(row.province ?? "") || "Ontario";
-      const city = toTitleCaseSmart(row.city ?? "") || "Ottawa";
-      const neighbourhood = toTitleCaseSmart(row.neighbourhood ?? "") || "";
-      const bio = row.bio ?? "";
-      const av = row.avatar_path ?? null;
-
-      setProfileName(name);
-      setProfileCountry(country);
-      setProfileProvince(province);
-      setProfileCity(city);
-      setProfileNeighbourhood(neighbourhood);
-      setProfileBio(bio);
-      setAvatarPath(av);
-
-      setDisplayName((prev) => prev || name);
-    }
-} finally {
-    setProfileLoading(false);
-
-    if (didCheck) {
-      setTimeout(() => setProfileReady(true), 0);
-    } else {
-      setProfileReady(false);
-    }
-  }
-} // ✅ CLOSE loadProfile()
-
- async function saveProfile() {
-  if (!bandSlug) return;
-
-  const uid = await getAuthedUserId();
-  if (!uid) {
-    setStatus("Not logged in.");
-    return;
-  }
-
-  const cleanName = normSpaces(profileName);
-
-  const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
-  const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
-  const cleanNeighbourhood = toTitleCaseSmart(profileNeighbourhood);
-
-  const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
-  const cleanBio = normSpaces(profileBio);
-
-  setProfileSaving(true);
-  setStatus("Saving profile...");
-
-  const payload = {
-    user_id: uid,
-    band_slug: bandSlug,
-    band_name: cleanName || bandSlug,
-    display_name: cleanName,
-    country: cleanCountry,
-    province: cleanProvince,
-    neighbourhood: cleanNeighbourhood || null,
-    city: cleanCity,
-    bio: cleanBio,
-    avatar_path: avatarPath,
-  };
-
-  const { error } = await supabase
-    .from("band_users")
-    .upsert(payload, { onConflict: "user_id,band_slug" });
-
-  if (error) {
-    setStatus(`Profile save error: ${error.message}`);
+    setStatus("Profile saved.");
+    setTimeout(() => setStatus(""), 1200);
     setProfileSaving(false);
-    return;
   }
-
-  // Update local state to normalized versions
-  setProfileName(cleanName);
-  setProfileCountry(cleanCountry);
-  setProfileProvince(cleanProvince);
-  setProfileNeighbourhood(cleanNeighbourhood);
-  setProfileCity(cleanCity);
-  setProfileBio(cleanBio);
-
-  setStatus("Profile saved.");
-  setTimeout(() => setStatus(""), 1200);
-  setProfileSaving(false);
-}
 
   async function uploadAvatar(file: File) {
     if (!bandSlug) {
@@ -489,10 +425,7 @@ async function loadProfile() {
       return;
     }
 
-    const ok =
-      file.type === "image/png" ||
-      file.type === "image/jpeg" ||
-      file.type === "image/webp";
+    const ok = file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/webp";
     if (!ok) {
       setStatus("Avatar must be PNG, JPG, or WEBP.");
       return;
@@ -519,12 +452,7 @@ async function loadProfile() {
 
       setAvatarPath(storagePath);
 
-      const { error } = await supabase
-        .from("band_users")
-        .update({ avatar_path: storagePath })
-        .eq("band_slug", bandSlug)
-        .eq("user_id", uid);
-
+      const { error } = await supabase.from("band_users").update({ avatar_path: storagePath }).eq("band_slug", bandSlug).eq("user_id", uid);
       if (error) throw error;
 
       setStatus("Profile pic uploaded.");
@@ -573,8 +501,7 @@ async function loadProfile() {
         city: cleanCity,
         neighbourhood: cleanNeighbourhood || null,
 
-
-        genre: "Punk", // keep as-is for now
+        genre: "Punk",
         is_radio: true,
 
         file_path: storagePath,
@@ -598,7 +525,7 @@ async function loadProfile() {
 
     setEditingId(t.id);
     setEditTitle(t.title ?? "");
-    setEditGenre(t.genre ?? ""); // ✅ NEW
+    setEditGenre(t.genre ?? "");
     setEditRadio(!!t.is_radio);
 
     if (editArtPreview) URL.revokeObjectURL(editArtPreview);
@@ -619,11 +546,11 @@ async function loadProfile() {
 
     setStatus("Saving...");
 
-    const cleanGenre = toTitleCaseSmart(editGenre || ""); // ✅ NEW (nice formatting)
+    const cleanGenre = toTitleCaseSmart(editGenre || "");
 
     const patch = {
       title: cleanTitle,
-      genre: cleanGenre || "Punk", // ✅ NEW (fallback)
+      genre: cleanGenre || "Punk",
       is_radio: editRadio,
       price_cents,
     };
@@ -670,19 +597,12 @@ async function loadProfile() {
       });
       if (up.error) throw up.error;
 
-      const { error } = await supabase
-        .from("tracks")
-        .update({ art_path: storagePath })
-        .eq("id", track.id);
+      const { error } = await supabase.from("tracks").update({ art_path: storagePath }).eq("id", track.id);
       if (error) throw error;
 
       const newPublic = getArtworkUrl(storagePath);
       setTracks((prev) =>
-        prev.map((p) =>
-          p.id === track.id
-            ? { ...p, art_path: storagePath, artUrl: withCacheBust(newPublic) }
-            : p
-        )
+        prev.map((p) => (p.id === track.id ? { ...p, art_path: storagePath, artUrl: withCacheBust(newPublic) } : p))
       );
 
       setStatus("Artwork uploaded.");
@@ -709,10 +629,7 @@ async function loadProfile() {
       return;
     }
 
-    const ok =
-      file.type === "image/png" ||
-      file.type === "image/jpeg" ||
-      file.type === "image/webp";
+    const ok = file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/webp";
     if (!ok) {
       setStatus("Flyer must be PNG, JPG, or WEBP.");
       return;
@@ -748,10 +665,7 @@ async function loadProfile() {
         track_id: eventTrackId || null,
       };
 
-      const { error } = await supabase
-        .from("events")
-        .upsert(payload, { onConflict: "band_slug,show_date" });
-
+      const { error } = await supabase.from("events").upsert(payload, { onConflict: "band_slug,show_date" });
       if (error) throw error;
 
       setEventStatus("Flyer uploaded + saved ✅");
@@ -789,9 +703,7 @@ async function loadProfile() {
         track_id: eventTrackId || null,
       };
 
-      const { error } = await supabase
-        .from("events")
-        .upsert(payload, { onConflict: "band_slug,show_date" });
+      const { error } = await supabase.from("events").upsert(payload, { onConflict: "band_slug,show_date" });
 
       if (error) {
         const msg = (error as any)?.message ?? String(error);
@@ -802,19 +714,13 @@ async function loadProfile() {
 
         if (!looksLikeConflictMissing) throw error;
 
-        await supabase
-          .from("events")
-          .delete()
-          .eq("band_slug", bandSlug)
-          .eq("show_date", showDate);
+        await supabase.from("events").delete().eq("band_slug", bandSlug).eq("show_date", showDate);
 
         const ins = await supabase.from("events").insert(payload);
         if (ins.error) throw ins.error;
       }
 
-      setEventStatus(
-        "✅ Submitted! Your submission is saved (and will update if you re-submit this date)."
-      );
+      setEventStatus("✅ Submitted! Your submission is saved (and will update if you re-submit this date).");
       await loadEvents();
       setTimeout(() => setStatus(""), 2200);
     } catch (e: any) {
@@ -825,9 +731,7 @@ async function loadProfile() {
   }
 
   async function deleteTrack(t: TrackView) {
-    const ok = confirm(
-      `Delete "${t.title}"?\n\nThis removes the DB row and the audio file.`
-    );
+    const ok = confirm(`Delete "${t.title}"?\n\nThis removes the DB row and the audio file.`);
     if (!ok) return;
 
     setStatus("Deleting...");
@@ -905,10 +809,7 @@ async function loadProfile() {
       return;
     }
 
-    const ok =
-      file.type === "image/png" ||
-      file.type === "image/jpeg" ||
-      file.type === "image/webp";
+    const ok = file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/webp";
     if (!ok) {
       setStatus("Gallery photo must be PNG, JPG, or WEBP.");
       return;
@@ -965,9 +866,7 @@ async function loadProfile() {
     if (!check.error) {
       const stillThere = (check.data ?? []).some((x) => x.name === filename);
       if (stillThere) {
-        alert(
-          "Remove() said success, but file is still there. This smells like a permission/policy issue or mismatch."
-        );
+        alert("Remove() said success, but file is still there. This smells like a permission/policy issue or mismatch.");
         return;
       }
     }
@@ -975,34 +874,31 @@ async function loadProfile() {
     await loadGallery();
   }
 
-useEffect(() => {
-  const { data } = supabase.auth.onAuthStateChange((event) => {
-    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-      loadProfile();
-      loadGallery();
-      refreshTracks();
-      loadEvents();
-    }
-  });
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        loadProfile();
+        loadGallery();
+        refreshTracks();
+        loadEvents();
+      }
+    });
 
-  return () => data.subscription.unsubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [bandSlug]);
+    return () => data.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bandSlug]);
 
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const n = url.searchParams.get("name");
+    if (n) setDisplayName(n);
 
-useEffect(() => {
-  const url = new URL(window.location.href);
-  const n = url.searchParams.get("name");
-  if (n) setDisplayName(n);
-
-  refreshTracks();
-  loadProfile();
-  loadGallery();
-  loadEvents();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [bandSlug]);
-
-
+    refreshTracks();
+    loadProfile();
+    loadGallery();
+    loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bandSlug]);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -1072,16 +968,11 @@ useEffect(() => {
         }
       />
 
-      {/* PROFILE STACK */}
-      <div
-        style={{
-          marginTop: 8,
-          display: "grid",
-          gap: 14,
-          alignItems: "start",
-        }}
-      >
-        {/* LEFT: Profile Pic */}
+      {/* =========================
+          1) PROFILE (STACKED)
+         ========================= */}
+      <div style={{ marginTop: 8, display: "grid", gap: 14, alignItems: "start" }}>
+        {/* PROFILE PIC */}
         <section
           style={{
             border: "1px solid #eee",
@@ -1115,11 +1006,7 @@ useEffect(() => {
           >
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt="profile pic"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
+              <img src={avatarUrl} alt="profile pic" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
               <div
                 style={{
@@ -1172,8 +1059,8 @@ useEffect(() => {
           </div>
         </section>
 
-        {/* RIGHT: Bio */}
-        <aside
+        {/* BIO + GALLERY */}
+        <section
           style={{
             border: "1px solid #eee",
             borderRadius: 18,
@@ -1234,7 +1121,7 @@ useEffect(() => {
             title="Will be saved standardized (ex: Ottawa)"
           />
 
-                    <input
+          <input
             value={profileNeighbourhood}
             onChange={(e) => setProfileNeighbourhood(e.target.value.toUpperCase())}
             placeholder="Neighbourhood (optional)"
@@ -1280,15 +1167,7 @@ useEffect(() => {
 
           {/* GALLERY */}
           <div style={{ borderTop: "1px solid #eee", paddingTop: 12, marginTop: 6 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                marginTop: 2,
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 2, flexWrap: "wrap" }}>
               <div style={{ fontWeight: 950, letterSpacing: 1 }}>Photos:</div>
 
               <label
@@ -1395,15 +1274,328 @@ useEffect(() => {
                 ))}
               </div>
             ) : (
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>
-                No photos yet. Upload a couple for a mini gallery.
-              </div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>No photos yet. Upload a couple for a mini gallery.</div>
             )}
           </div>
-        </aside>
+        </section>
       </div>
 
-      {/* NEXT SHOW (events MVP) */}
+      {/* =========================
+          2) TRACKS (SOLO)
+         ========================= */}
+      <section style={{ marginTop: 14, display: "grid", gap: 10 }}>
+        {/* Upload header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
+            background: "white",
+            color: "black",
+            padding: "10px 14px",
+            borderRadius: 12,
+            border: "1px solid #eee",
+          }}
+        >
+          <div style={{ fontWeight: 900, letterSpacing: 1 }}>TRACKS</div>
+
+          <label
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid #000",
+              cursor: uploading || !bioComplete ? "not-allowed" : "pointer",
+              opacity: uploading || !bioComplete ? 0.35 : 1,
+              fontWeight: 900,
+              background: "black",
+              color: "#2bff00",
+              whiteSpace: "nowrap",
+            }}
+            title={!bioComplete ? "Complete your band bio before uploading songs." : "Upload an audio file"}
+          >
+            Upload audio
+            <input
+              type="file"
+              accept="audio/*"
+              disabled={uploading || !bioComplete}
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.currentTarget.value = "";
+                if (!f) return;
+                onUpload(f);
+              }}
+            />
+          </label>
+        </div>
+
+        <div style={{ fontSize: 12, opacity: 0.7 }}>{tracks.length} total</div>
+
+        {tracks.map((t) => {
+          const priceCents = Number((t as any).price_cents ?? 100);
+          const priceLabel = `$${(priceCents / 100).toFixed(2)}`;
+          const loc = t.city || "";
+
+          return (
+            <div
+              key={t.id}
+              style={{
+                border: "1px solid #eee",
+                borderRadius: 14,
+                padding: 12,
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              {editingId === t.id ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="Title"
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid #ccc",
+                    }}
+                  />
+
+                  <input
+                    value={editGenre}
+                    onChange={(e) => setEditGenre(e.target.value)}
+                    placeholder="Genre (ex: Punk, Pop, Metal)"
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid #ccc",
+                    }}
+                  />
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      value={editPrice}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9.]/g, "");
+                        setEditPrice(v);
+                      }}
+                      placeholder="1.00"
+                      inputMode="decimal"
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #ccc",
+                        flex: "0 0 140px",
+                      }}
+                      title="Sell price in dollars. Use 0.00 for free / not for sale yet."
+                    />
+
+                    <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input type="checkbox" checked={editRadio} onChange={(e) => setEditRadio(e.target.checked)} />
+                      Radio
+                    </label>
+
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>Location is a snapshot from upload time. Genre is editable per-song.</div>
+                  </div>
+
+                  {/* Artwork picker */}
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <label
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #ccc",
+                        cursor: artUploading ? "not-allowed" : "pointer",
+                        fontWeight: 900,
+                        background: "black",
+                        color: "white",
+                        opacity: artUploading ? 0.6 : 1,
+                      }}
+                      title="Select an image — it will upload automatically"
+                    >
+                      {artUploading ? "Uploading..." : "Pick artwork"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={artUploading}
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] ?? null;
+                          e.currentTarget.value = "";
+                          if (!f) return;
+                          pickAndUploadArtwork(t, f);
+                        }}
+                      />
+                    </label>
+
+                    {editArtPreview || t.artUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={editArtPreview || t.artUrl}
+                        alt="artwork preview"
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 10,
+                          objectFit: "cover",
+                          border: "1px solid #eee",
+                        }}
+                      />
+                    ) : null}
+
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>Select image → auto-saves</div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => saveEdit(t.id)}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #ccc",
+                        fontWeight: 950,
+                        background: "black",
+                        color: "white",
+                      }}
+                    >
+                      Save
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setEditingId(null);
+                        setEditGenre("");
+                        if (editArtPreview) URL.revokeObjectURL(editArtPreview);
+                        setEditArtPreview("");
+                        setArtUploading(false);
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #ccc",
+                        background: "black",
+                        color: "white",
+                        fontWeight: 900,
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "44px minmax(0,1fr) auto",
+                      gap: 10,
+                      alignItems: "center",
+                    }}
+                  >
+                    {t.artUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={t.artUrl}
+                        alt="artwork"
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 10,
+                          objectFit: "cover",
+                          border: "1px solid #eee",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 10,
+                          border: "1px solid #eee",
+                          opacity: 0.35,
+                        }}
+                      />
+                    )}
+
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 900, whiteSpace: "normal", overflow: "visible", textOverflow: "clip", lineHeight: 1.25 }}>
+                        {t.title}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 12,
+                          opacity: 0.72,
+                          marginTop: 4,
+                          whiteSpace: "normal",
+                          overflow: "visible",
+                          textOverflow: "clip",
+                          lineHeight: 1.25,
+                        }}
+                        title={loc}
+                      >
+                        <b>{priceLabel}</b>, {t.is_radio ? "Yes" : "No"} Radio, {loc}, {t.genre}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => startEdit(t)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid #ccc",
+                          background: "black",
+                          color: "white",
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => deleteTrack(t)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid #ccc",
+                          background: "black",
+                          color: "white",
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ paddingLeft: 54 }}>
+                    {t.url ? (
+                      <audio
+                        controls
+                        src={t.url}
+                        preload="none"
+                        style={{ width: "100%" }}
+                        controlsList="nodownload noplaybackrate"
+                        onPlay={() => setNowPlaying(t)}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>No public URL yet (file_path is missing or bucket isn’t public)</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </section>
+
+      {/* =========================
+          3) NEXT SHOW (SOLO)
+         ========================= */}
       <section
         style={{
           marginTop: 14,
@@ -1414,32 +1606,18 @@ useEffect(() => {
           gap: 12,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div style={{ display: "grid", gap: 6 }}>
             <div style={{ fontWeight: 950, letterSpacing: 1 }}>When is your next show?</div>
             {eventStatus ? <div style={{ fontSize: 12, opacity: 0.75 }}>{eventStatus}</div> : null}
           </div>
 
-          <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 800 }}>
-            One submission per band per date (saving again updates it)
-          </div>
+          <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 800 }}>One submission per band per date (saving again updates it)</div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: 14,
-            alignItems: "start",
-          }}
-        >
-          {/* LEFT: Submit */}
+        {/* STACK: Submit then submissions */}
+        <div style={{ display: "grid", gap: 14, alignItems: "start" }}>
+          {/* Submit */}
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               <div style={{ display: "grid", gap: 6 }}>
@@ -1448,27 +1626,16 @@ useEffect(() => {
                   type="date"
                   value={showDate}
                   onChange={(e) => setShowDate(e.target.value)}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #ccc",
-                  }}
+                  style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ccc" }}
                 />
               </div>
 
               <div style={{ display: "grid", gap: 6, minWidth: 260 }}>
-                <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>
-                  SHOWCASE TRACK
-                </div>
+                <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>SHOWCASE TRACK</div>
                 <select
                   value={eventTrackId}
                   onChange={(e) => setEventTrackId(e.target.value)}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #ccc",
-                    minWidth: 260,
-                  }}
+                  style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ccc", minWidth: 260 }}
                   title="Pick ONE track for the event playlist"
                 >
                   <option value="">Pick a track (optional)</option>
@@ -1497,11 +1664,7 @@ useEffect(() => {
                   }}
                   title="Upload the show flyer (PNG/JPG/WEBP)"
                 >
-                  {flyerUploading
-                    ? "Uploading..."
-                    : flyerUrl
-                    ? "Flyer uploaded ✅ (replace)"
-                    : "Upload flyer"}
+                  {flyerUploading ? "Uploading..." : flyerUrl ? "Flyer uploaded ✅ (replace)" : "Upload flyer"}
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -1539,9 +1702,7 @@ useEffect(() => {
                 </button>
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.7, marginLeft: 6 }}>
-                City/genre auto from your profile.
-              </div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginLeft: 6 }}>City/genre auto from your profile.</div>
             </div>
 
             {flyerUrl ? (
@@ -1559,23 +1720,12 @@ useEffect(() => {
                 }}
               />
             ) : (
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                Tip: pick date → upload flyer → pick a track → save. (Saving again for the same
-                date updates it.)
-              </div>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>Tip: pick date → upload flyer → pick a track → save. (Saving again for the same date updates it.)</div>
             )}
           </div>
 
-          {/* RIGHT: Your submissions list */}
-          <aside
-            style={{
-              border: "1px solid #eee",
-              borderRadius: 16,
-              padding: 12,
-              display: "grid",
-              gap: 10,
-            }}
-          >
+          {/* Submissions list */}
+          <aside style={{ border: "1px solid #eee", borderRadius: 16, padding: 12, display: "grid", gap: 10 }}>
             <div style={{ fontWeight: 950, letterSpacing: 0.7 }}>Your submitted shows</div>
 
             {eventsLoading ? (
@@ -1583,8 +1733,7 @@ useEffect(() => {
             ) : events.length ? (
               <div style={{ display: "grid", gap: 10 }}>
                 {events.slice(0, 6).map((ev) => {
-                  const trackTitle =
-                    (ev.track_id && tracks.find((t) => t.id === ev.track_id)?.title) || "—";
+                  const trackTitle = (ev.track_id && tracks.find((t) => t.id === ev.track_id)?.title) || "—";
                   const flyer = withCacheBust(getFlyerUrl(ev.flyer_path));
 
                   return (
@@ -1614,15 +1763,7 @@ useEffect(() => {
                           }}
                         />
                       ) : (
-                        <div
-                          style={{
-                            width: 64,
-                            height: 64,
-                            borderRadius: 12,
-                            border: "1px solid #eee",
-                            opacity: 0.35,
-                          }}
-                        />
+                        <div style={{ width: 64, height: 64, borderRadius: 12, border: "1px solid #eee", opacity: 0.35 }} />
                       )}
 
                       <div style={{ minWidth: 0 }}>
@@ -1632,10 +1773,10 @@ useEffect(() => {
                             fontSize: 12,
                             opacity: 0.75,
                             marginTop: 4,
-whiteSpace: "normal",
-overflow: "visible",
-textOverflow: "clip",
-lineHeight: 1.25,
+                            whiteSpace: "normal",
+                            overflow: "visible",
+                            textOverflow: "clip",
+                            lineHeight: 1.25,
                           }}
                           title={trackTitle}
                         >
@@ -1650,442 +1791,91 @@ lineHeight: 1.25,
                 })}
 
                 {events.length > 6 ? (
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    Showing latest 6 (you have {events.length}).
-                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>Showing latest 6 (you have {events.length}).</div>
                 ) : null}
               </div>
             ) : (
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                Nothing submitted yet. Your first submit will appear here instantly.
-              </div>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>Nothing submitted yet. Your first submit will appear here instantly.</div>
             )}
           </aside>
         </div>
       </section>
 
-      {/* MAIN DASHBOARD STACK: Tracks then Merch */}
-      <div
-        style={{
-          marginTop: 18,
-          display: "grid",
-          gap: 14,
-          alignItems: "start",
-        }}
-      >
-        {/* LEFT: TRACKS */}
-        <section style={{ display: "grid", gap: 10 }}>
-          {/* Upload audio ABOVE the list */}
-          <div
+      {/* =========================
+          4) MERCH (SOLO)
+         ========================= */}
+      <section style={{ marginTop: 14, display: "grid", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
+            background: "#eee",
+            color: "black",
+            padding: "10px 14px",
+            borderRadius: 12,
+          }}
+        >
+          <div style={{ fontWeight: 900, letterSpacing: 1 }}>MERCH</div>
+
+          <button
+            disabled
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              background: "white",
-              color: "black",
-              padding: "10px 14px",
-              borderRadius: 12,
-              marginBottom: 10,
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid #ccc",
+              background: "#888",
+              color: "white",
+              fontWeight: 900,
+              whiteSpace: "nowrap",
+              cursor: "not-allowed",
             }}
           >
-            <div style={{ fontWeight: 900, letterSpacing: 1 }}>TRACKS</div>
+            Upload merch
+          </button>
+        </div>
 
-            <label
-  style={{
-    padding: "8px 12px",
-    borderRadius: 10,
-    border: "1px solid #000",
-    cursor: uploading || !bioComplete ? "not-allowed" : "pointer",
-    opacity: uploading || !bioComplete ? 0.35 : 1,
-    fontWeight: 900,
-    background: "black",
-    color: "#2bff00",
-    whiteSpace: "nowrap",
-  }}
-  title={
-    !bioComplete
-      ? "Complete your band bio before uploading songs."
-      : "Upload an audio file"
-  }
+        <section
+          style={{
+            border: "1px solid #eee",
+            borderRadius: 18,
+            padding: 14,
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>Coming soon</div>
 
->
-  Upload audio
-  <input
-    type="file"
-    accept="audio/*"
-    disabled={uploading || !bioComplete}
-    style={{ display: "none" }}
-    onChange={(e) => {
-      const f = e.target.files?.[0];
-      e.currentTarget.value = "";
-      if (!f) return;
+          <div style={{ fontSize: 16, fontWeight: 950, lineHeight: 1.2 }}>We’ll add merch items here (shirt / tape / vinyl / patches…)</div>
 
-
-
-      onUpload(f);
-    }}
-  />
-</label>
+          <div style={{ fontSize: 13, opacity: 0.8, lineHeight: 1.35 }}>
+            Next we’ll wire this to a merch table so bands can add items with:
+            <div style={{ marginTop: 8 }}>• name</div>
+            <div>• price</div>
+            <div>• buy link</div>
+            <div>• photo</div>
           </div>
 
-          <div style={{ fontSize: 12, opacity: 0.7 }}>{tracks.length} total</div>
-
-          {tracks.map((t) => {
-            const priceCents = Number((t as any).price_cents ?? 100);
-            const priceLabel = `$${(priceCents / 100).toFixed(2)}`;
-
-            const loc = t.city || "";
-
-            return (
-              <div
-                key={t.id}
-                style={{
-                  border: "1px solid #eee",
-                  borderRadius: 14,
-                  padding: 12,
-                  display: "grid",
-                  gap: 8,
-                }}
-              >
-                {editingId === t.id ? (
-                  <div style={{ display: "grid", gap: 10 }}>
-                    <input
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      placeholder="Title"
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid #ccc",
-                      }}
-                    />
-                    <input
-  value={editGenre}
-  onChange={(e) => setEditGenre(e.target.value)}
-  placeholder="Genre (ex: Punk, Pop, Metal)"
-  style={{
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #ccc",
-  }}
-  />
-
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                      <input
-                        value={editPrice}
-                        onChange={(e) => {
-                          const v = e.target.value.replace(/[^0-9.]/g, "");
-                          setEditPrice(v);
-                        }}
-                        placeholder="1.00"
-                        inputMode="decimal"
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: 10,
-                          border: "1px solid #ccc",
-                          flex: "0 0 140px",
-                        }}
-                        title="Sell price in dollars. Use 0.00 for free / not for sale yet."
-                      />
-
-                      <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={editRadio}
-                          onChange={(e) => setEditRadio(e.target.checked)}
-                        />
-                        Radio
-                      </label>
-
-<div style={{ fontSize: 12, opacity: 0.7 }}>
-  Location is a snapshot from upload time. Genre is editable per-song.
-</div>
-                    </div>
-
-                    {/* Artwork picker (auto-uploads on select) */}
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <label
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: 10,
-                          border: "1px solid #ccc",
-                          cursor: artUploading ? "not-allowed" : "pointer",
-                          fontWeight: 900,
-                          background: "black",
-                          color: "white",
-                          opacity: artUploading ? 0.6 : 1,
-                        }}
-                        title="Select an image — it will upload automatically"
-                      >
-                        {artUploading ? "Uploading..." : "Pick artwork"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={artUploading}
-                          style={{ display: "none" }}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] ?? null;
-                            e.currentTarget.value = "";
-                            if (!f) return;
-                            pickAndUploadArtwork(t, f);
-                          }}
-                        />
-                      </label>
-
-                      {editArtPreview || t.artUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={editArtPreview || t.artUrl}
-                          alt="artwork preview"
-                          style={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: 10,
-                            objectFit: "cover",
-                            border: "1px solid #eee",
-                          }}
-                        />
-                      ) : null}
-
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>Select image → auto-saves</div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => saveEdit(t.id)}
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: 10,
-                          border: "1px solid #ccc",
-                          fontWeight: 950,
-                          background: "black",
-                          color: "white",
-                        }}
-                      >
-                        Save
-                      </button>
-
-                      <button
-                        onClick={() => {
-setEditingId(null);
-setEditGenre(""); // ✅ NEW
-if (editArtPreview) URL.revokeObjectURL(editArtPreview);
-setEditArtPreview("");
-setArtUploading(false);
-                        }}
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: 10,
-                          border: "1px solid #ccc",
-                          background: "black",
-                          color: "white",
-                          fontWeight: 900,
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "44px minmax(0,1fr) auto",
-                        gap: 10,
-                        alignItems: "center",
-                      }}
-                    >
-                      {t.artUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={t.artUrl}
-                          alt="artwork"
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 10,
-                            objectFit: "cover",
-                            border: "1px solid #eee",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 10,
-                            border: "1px solid #eee",
-                            opacity: 0.35,
-                          }}
-                        />
-                      )}
-
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: 900,
-whiteSpace: "normal",
-overflow: "visible",
-textOverflow: "clip",
-lineHeight: 1.25,
- 
-                          }}
-                        >
-                          {t.title}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 12,
-                            opacity: 0.72,
-                            marginTop: 4,
-whiteSpace: "normal",
-overflow: "visible",
-textOverflow: "clip",
-lineHeight: 1.25,
-                          }}
-                          title={loc}
-                        >
-                        <b>{priceLabel}</b>, {t.is_radio ? "Yes" : "No"} Radio, {loc}, {t.genre}
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                        <button
-                          onClick={() => startEdit(t)}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: 10,
-                            border: "1px solid #ccc",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 800,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={() => deleteTrack(t)}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: 10,
-                            border: "1px solid #ccc",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 800,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-
-                    <div style={{ paddingLeft: 54 }}>
-                      {t.url ? (
-                        <audio
-                          controls
-                          src={t.url}
-                          preload="none"
-                          style={{ width: "100%" }}
-                          controlsList="nodownload noplaybackrate"
-                          onPlay={() => setNowPlaying(t)}
-                        />
-                      ) : (
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>
-                          No public URL yet (file_path is missing or bucket isn’t public)
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          <button
+            disabled
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              background: "black",
+              color: "white",
+              fontWeight: 900,
+              opacity: 0.5,
+              cursor: "not-allowed",
+            }}
+            title="We’ll wire this up next"
+          >
+            + Add merch item
+          </button>
         </section>
-
-        {/* RIGHT: MERCH */}
-        <aside style={{ display: "grid", gap: 10 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              background: "#eee",
-              color: "black",
-              padding: "10px 14px",
-              borderRadius: 12,
-              marginBottom: 10,
-            }}
-          >
-            <div style={{ fontWeight: 900, letterSpacing: 1 }}>MERCH</div>
-
-            <button
-              disabled
-              style={{
-                padding: "8px 12px",
-                borderRadius: 10,
-                border: "1px solid #ccc",
-                background: "#888",
-                color: "white",
-                fontWeight: 900,
-                whiteSpace: "nowrap",
-                cursor: "not-allowed",
-              }}
-            >
-              Upload merch
-            </button>
-          </div>
-
-          <section
-            style={{
-              border: "1px solid #eee",
-              borderRadius: 18,
-              padding: 14,
-              display: "grid",
-              gap: 10,
-            }}
-          >
-            <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
-              Coming soon
-            </div>
-
-            <div style={{ fontSize: 16, fontWeight: 950, lineHeight: 1.2 }}>
-              We’ll add merch items here (shirt / tape / vinyl / patches…)
-            </div>
-
-            <div style={{ fontSize: 13, opacity: 0.8, lineHeight: 1.35 }}>
-              Next we’ll wire this to a merch table so bands can add items with:
-              <div style={{ marginTop: 8 }}>• name</div>
-              <div>• price</div>
-              <div>• buy link</div>
-              <div>• photo</div>
-            </div>
-
-            <button
-              disabled
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid #ddd",
-                background: "black",
-                color: "white",
-                fontWeight: 900,
-                opacity: 0.5,
-                cursor: "not-allowed",
-              }}
-              title="We’ll wire this up next"
-            >
-              + Add merch item
-            </button>
-          </section>
-        </aside>
-      </div>
-
-
+      </section>
 
       {/* LIGHTBOX MODAL (Dashboard Gallery) */}
       {lightboxOpen && activePhoto ? (
@@ -2111,15 +1901,7 @@ lineHeight: 1.25,
               overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: 10,
-                gap: 10,
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, gap: 10 }}>
               <div style={{ color: "white", fontWeight: 900, fontSize: 12, opacity: 0.9 }}>
                 {lightboxIndex + 1}/{gallery.length}
               </div>
@@ -2193,6 +1975,3 @@ lineHeight: 1.25,
     </main>
   );
 }
-
-
-
