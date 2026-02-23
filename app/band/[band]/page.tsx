@@ -13,6 +13,7 @@ type EventRow = {
   show_date: string;
   flyer_path: string | null;
   track_id: string | null;
+  note: string | null; // ✅ we'll use this as SHOW NAME for now
   created_at: string;
 };
 
@@ -185,6 +186,7 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
   // --- NEXT SHOW (events MVP) ---
   const [showDate, setShowDate] = useState<string>("");
+  const [showName, setShowName] = useState<string>(""); // ✅ NEW
   const [eventTrackId, setEventTrackId] = useState<string>("");
   const [flyerPath, setFlyerPath] = useState<string | null>(null);
   const [flyerUploading, setFlyerUploading] = useState(false);
@@ -280,7 +282,7 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
     const { data, error } = await supabase
       .from("events")
-      .select("id,band_slug,city,genre,show_date,flyer_path,track_id,created_at")
+      .select("id,band_slug,city,genre,show_date,flyer_path,track_id,note,created_at")
       .eq("band_slug", bandSlug)
       .gte("show_date", today)
       .order("show_date", { ascending: true })
@@ -656,11 +658,14 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
       const city = toTitleCaseSmart(profileCity) || "Ottawa";
       const genre = "Punk";
 
+      const cleanShowName = normSpaces(showName).toUpperCase();
+
       const payload = {
         band_slug: bandSlug,
         city,
         genre,
         show_date: showDate,
+        note: cleanShowName || null, // ✅ show name saved into events.note
         flyer_path: storagePath,
         track_id: eventTrackId || null,
       };
@@ -694,11 +699,14 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
       const city = toTitleCaseSmart(profileCity) || "Ottawa";
       const genre = "Punk";
 
+      const cleanShowName = normSpaces(showName).toUpperCase();
+
       const payload = {
         band_slug: bandSlug,
         city,
         genre,
         show_date: showDate,
+        note: cleanShowName || null, // ✅ show name saved into events.note
         flyer_path: flyerPath || null,
         track_id: eventTrackId || null,
       };
@@ -761,6 +769,34 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
     if (nowPlaying?.id === t.id) setNowPlaying(null);
     setStatus("");
     await refreshTracks();
+  }
+
+  async function deleteEvent(ev: EventRow) {
+    const ok = confirm(`Delete this show?\n\n${ev.show_date}\n\nThis removes the event submission and its flyer.`);
+    if (!ok) return;
+
+    setEventStatus("Deleting show...");
+
+    // 1) Remove flyer file (if present)
+    if (ev.flyer_path) {
+      const rm = await supabase.storage.from("flyers").remove([ev.flyer_path]);
+      if (rm.error) {
+        setEventStatus(`Flyer delete failed: ${rm.error.message}`);
+        return;
+      }
+    }
+
+    // 2) Remove DB row
+    const del = await supabase.from("events").delete().eq("id", ev.id).eq("band_slug", bandSlug);
+    if (del.error) {
+      setEventStatus(`Event delete failed: ${del.error.message}`);
+      return;
+    }
+
+    // 3) Refresh list
+    setEventStatus("Deleted ✅");
+    await loadEvents();
+    setTimeout(() => setEventStatus(""), 1200);
   }
 
   async function loadGallery() {
@@ -1631,6 +1667,22 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
               </div>
 
               <div style={{ display: "grid", gap: 6, minWidth: 260 }}>
+                <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>SHOW NAME</div>
+                <input
+                  value={showName}
+                  onChange={(e) => setShowName(e.target.value.toUpperCase())}
+                  placeholder="Example: Unique show name! Punk Party (I see your PP)"
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #ccc",
+                    textTransform: "uppercase",
+                  }}
+                  title="Optional — saved in CAPS to keep things consistent"
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 6, minWidth: 260 }}>
                 <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>SHOWCASE TRACK</div>
                 <select
                   value={eventTrackId}
@@ -1736,12 +1788,12 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
                   const trackTitle = (ev.track_id && tracks.find((t) => t.id === ev.track_id)?.title) || "—";
                   const flyer = withCacheBust(getFlyerUrl(ev.flyer_path));
 
-                  return (
+                   return (
                     <div
                       key={ev.id}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "64px 1fr",
+                        gridTemplateColumns: "64px 1fr auto",
                         gap: 10,
                         alignItems: "center",
                         border: "1px solid #eee",
@@ -1767,7 +1819,15 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
                       )}
 
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 900 }}>{ev.show_date}</div>
+                        
+                      <div style={{ fontWeight: 900 }}>{ev.show_date}</div>
+
+                        {ev.note ? (
+                          <div style={{ fontSize: 12, fontWeight: 950, marginTop: 4, letterSpacing: 0.4 }}>
+                            {ev.note}
+                          </div>
+                        ) : null}
+
                         <div
                           style={{
                             fontSize: 12,
@@ -1786,6 +1846,24 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
                           {ev.city} • {ev.genre}
                         </div>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => deleteEvent(ev)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid #ccc",
+                          background: "black",
+                          color: "white",
+                          fontWeight: 900,
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                        }}
+                        title="Delete this show submission"
+                      >
+                        Delete
+                      </button>
                     </div>
                   );
                 })}
