@@ -247,7 +247,7 @@ export default function HomePage() {
     sessionStorage.setItem(KEY, "1");
 
     // timings (tweak these)
-    const SHOW_MS = 900; // hold
+    const SHOW_MS = 1200; // hold
     const FADE_MS = 3300; // fade duration
 
     setSplashPhase("show");
@@ -709,7 +709,7 @@ export default function HomePage() {
             position: "fixed",
             inset: 0,
             zIndex: 100000,
-            background: "black",
+            background: "white",
             display: "grid",
             placeItems: "center",
             padding: 18,
@@ -720,13 +720,12 @@ export default function HomePage() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/StreetLevelLogo-Punk.jpg"
+            src="/StreetLevelLogo(Punk).png"
             alt="StreetLevel"
             style={{
               width: "min(92vw, 860px)",
               height: "auto",
               borderRadius: 18,
-              border: "1px solid rgba(255,255,255,0.15)",
               display: "block",
             }}
           />
