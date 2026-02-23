@@ -1671,13 +1671,13 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
                 <input
                   value={showName}
                   onChange={(e) => setShowName(e.target.value.toUpperCase())}
-                  placeholder="Example: Unique show name! Punk Party (I see your PP)"
+                  placeholder="Ex: Unique Show Name! Punk Pizza Party!"
                   style={{
                     padding: "10px 12px",
                     borderRadius: 10,
                     border: "1px solid #ccc",
                     textTransform: "uppercase",
-                    fontSize: 13,   // 👈 try 12, 13, or 14 — pick what feels best
+                    fontSize: 9,   // 👈 try 12, 13, or 14 — pick what feels best
                     fontWeight: 800 // optional: makes it a bit less shouty
                   }}
                   title="Optional — saved in CAPS to keep things consistent"
