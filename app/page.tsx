@@ -180,6 +180,9 @@ export default function HomePage() {
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
 
+  // ✅ Splash screen (one-time per session)
+  const [splashPhase, setSplashPhase] = useState<"off" | "show" | "fade">("off");
+
   // mobile detection (simple)
   const [isNarrow, setIsNarrow] = useState(false);
   useEffect(() => {
@@ -231,6 +234,35 @@ export default function HomePage() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ✅ One-time splash (per session)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const KEY = "sl_splash_seen_v1";
+    const already = sessionStorage.getItem(KEY);
+
+    if (already) return;
+
+    sessionStorage.setItem(KEY, "1");
+
+    // timings (tweak these)
+    const SHOW_MS = 800; // hold
+    const FADE_MS = 1200; // fade duration
+
+    setSplashPhase("show");
+
+    const t1 = window.setTimeout(() => setSplashPhase("fade"), SHOW_MS);
+    const t2 = window.setTimeout(() => setSplashPhase("off"), SHOW_MS + FADE_MS + 50);
+
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
+
+
+  
 
   // keep URL in sync (nice for sharing)
   function syncUrl() {
@@ -662,12 +694,46 @@ export default function HomePage() {
   return (
     <main
       style={{
+        position: "relative",
         minHeight: "100vh",
         fontFamily: "sans-serif",
         background: "white",
         color: "black",
       }}
     >
+
+      {/* ✅ SPLASH SCREEN (one-time per session) */}
+      {splashPhase !== "off" ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100000,
+            background: "black",
+            display: "grid",
+            placeItems: "center",
+            padding: 18,
+            opacity: splashPhase === "fade" ? 0 : 1,
+            transition: "opacity 1200ms ease",
+            pointerEvents: "none",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/StreetLevelLogo-Punk.jpg"
+            alt="StreetLevel"
+            style={{
+              width: "min(92vw, 860px)",
+              height: "auto",
+              borderRadius: 18,
+              border: "1px solid rgba(255,255,255,0.15)",
+              display: "block",
+            }}
+          />
+        </div>
+      ) : null}
+
+
       {/* ===== HERO: Full screen logo feel ===== */}
       {!hasStarted && filtersOpen ? (
         <div
