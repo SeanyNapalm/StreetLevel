@@ -1677,6 +1677,8 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
                     borderRadius: 10,
                     border: "1px solid #ccc",
                     textTransform: "uppercase",
+                    fontSize: 13,   // 👈 try 12, 13, or 14 — pick what feels best
+                    fontWeight: 800 // optional: makes it a bit less shouty
                   }}
                   title="Optional — saved in CAPS to keep things consistent"
                 />
