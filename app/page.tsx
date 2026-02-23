@@ -496,6 +496,7 @@ export default function HomePage() {
   // - If filters exist, we do client-side filtering for display/queue order.
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
+    const qqSlug = qq.replace(/\s+/g, "-");
     const co = country.trim().toLowerCase();
     const pr = province.trim().toLowerCase();
     const cc = city.trim().toLowerCase();
@@ -506,7 +507,11 @@ export default function HomePage() {
     if (!hasFilter) return tracks;
 
     return tracks.filter((t) => {
-      const matchQ = !qq || t.title.toLowerCase().includes(qq) || t.band_slug.toLowerCase().includes(qq);
+      const matchQ =
+        !qq ||
+        t.title.toLowerCase().includes(qq) ||
+        t.band_slug.toLowerCase().includes(qq) ||
+        t.band_slug.toLowerCase().includes(qqSlug);
 
       const matchCountry = !co || (t.country ?? "").toLowerCase().includes(co);
       const matchProvince = !pr || (t.province ?? "").toLowerCase().includes(pr);
