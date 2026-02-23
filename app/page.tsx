@@ -247,8 +247,8 @@ export default function HomePage() {
     sessionStorage.setItem(KEY, "1");
 
     // timings (tweak these)
-    const SHOW_MS = 800; // hold
-    const FADE_MS = 1200; // fade duration
+    const SHOW_MS = 900; // hold
+    const FADE_MS = 3300; // fade duration
 
     setSplashPhase("show");
 
