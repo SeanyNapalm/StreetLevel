@@ -142,7 +142,10 @@ export default function HomePage() {
   const [status, setStatus] = useState("");
 
   // WHO
-  const [q, setQ] = useState(""); // band name or song title search
+ const [q, setQ] = useState(""); // band name or song title search
+
+  // EVENT SEARCH (exact show name stored in events.note)
+  const [eventShowName, setEventShowName] = useState("");
 
   // WHAT
   const [genre, setGenre] = useState("");
@@ -206,6 +209,7 @@ export default function HomePage() {
     const g = url.searchParams.get("genre") ?? "";
     const d = url.searchParams.get("date") ?? "";
     const qq = url.searchParams.get("q") ?? "";
+    const evn = url.searchParams.get("event") ?? "";
     const off = url.searchParams.get("offline") ?? "";
 
     if (co) setCountry(co);
@@ -216,6 +220,7 @@ export default function HomePage() {
     if (g) setGenre(g);
     if (d) setDate(d);
     if (qq) setQ(qq);
+    if (evn) setEventShowName(evn);
 
     if (off === "1" || off.toLowerCase() === "true") setOfflineMode(true);
 
@@ -226,7 +231,7 @@ export default function HomePage() {
     else setWhereStep("country");
 
     // If any filters exist, don't force the hero overlay forever
-    const any = Boolean(co || pr || ci || nb || g || d || qq || off);
+    const any = Boolean(co || pr || ci || nb || g || d || qq || evn || off);
     if (any) {
       setFiltersOpen(false);
       setHasStarted(true);
@@ -282,6 +287,7 @@ export default function HomePage() {
     setOrDel("genre", genre);
     setOrDel("date", date);
     setOrDel("q", q);
+    setOrDel("event", eventShowName);
 
     if (offlineMode) url.searchParams.set("offline", "1");
     else url.searchParams.delete("offline");
@@ -298,15 +304,26 @@ export default function HomePage() {
 
     setStatus("Loading...");
 
-    // ===== EVENT RADIO MODE (when date is chosen) =====
-    if (date) {
+   // ===== EVENT RADIO MODE (date OR event show-name search) =====
+    const cleanEventName = normSpaces(eventShowName || "").toUpperCase();
+
+    if (date || cleanEventName) {
       setEventMode(true);
 
       let evQ = supabase
         .from("events")
-        .select("id, city, genre, show_date, flyer_path, track_id, created_at")
-        .eq("show_date", date)
+        .select("id, city, genre, show_date, note, flyer_path, track_id, created_at")
         .order("created_at", { ascending: false });
+
+      // If date chosen, filter by date
+      if (date) {
+        evQ = evQ.eq("show_date", date);
+      }
+
+      // If event show name typed, filter by EXACT match on events.note (stored in CAPS)
+      if (cleanEventName) {
+        evQ = evQ.eq("note", cleanEventName);
+      }
 
       const { data: evs, error: evErr } = await evQ;
 
@@ -320,7 +337,7 @@ export default function HomePage() {
 
       const eventRows = (evs ?? []) as any[];
 
-      // dropdown options from ALL events on that date
+      // dropdown options from ALL matching events
       {
         const gset = new Set<string>();
         const cset = new Set<string>();
@@ -334,14 +351,20 @@ export default function HomePage() {
         setEventCityOptions(Array.from(cset).sort((a, b) => a.localeCompare(b)));
       }
 
-      // In event mode: require date + city + genre (unchanged from your logic)
-      if (!city.trim() || !genre.trim()) {
+      // If they're using event-name search, we do NOT require city+genre.
+      // If they're using date-only event radio, keep your old rule: require city+genre.
+      if (!cleanEventName && date && (!city.trim() || !genre.trim())) {
         setTracks([]);
         setStatus("Pick a date + city + genre to see event radio songs.");
         return;
       }
 
       const filteredEvents = eventRows.filter((e) => {
+        // If event-name search is used, the SQL already narrowed it, but we keep this safe anyway.
+        if (cleanEventName) {
+          return (e.note ?? "").toUpperCase() === cleanEventName;
+        }
+
         const c = (e.city ?? "").toLowerCase();
         const g = (e.genre ?? "").toLowerCase();
         return c.includes(city.trim().toLowerCase()) && g.includes(genre.trim().toLowerCase());
@@ -351,7 +374,11 @@ export default function HomePage() {
 
       if (!trackIds.length) {
         setTracks([]);
-        setStatus(`No events found for ${date} with ${city} + ${genre}.`);
+        if (cleanEventName) {
+          setStatus(`No songs found for event name: ${cleanEventName}`);
+        } else {
+          setStatus(`No events found for ${date} with ${city} + ${genre}.`);
+        }
         return;
       }
 
@@ -383,7 +410,12 @@ export default function HomePage() {
       });
 
       setTracks(mapped);
-      setStatus(`Event radio for ${date}`);
+
+      if (cleanEventName) {
+        setStatus(`Event search: ${cleanEventName}`);
+      } else {
+        setStatus(`Event radio for ${date}`);
+      }
       return;
     }
 
@@ -433,7 +465,7 @@ export default function HomePage() {
     loadTracks();
     syncUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, country, province, city, neighbourhood, genre, q, offlineMode]);
+    }, [date, country, province, city, neighbourhood, genre, q, eventShowName, offlineMode]);
 
   // ============== OPTIONS ==============
     const genreOptions = useMemo(() => {
@@ -1073,7 +1105,7 @@ export default function HomePage() {
     width: "min(720px, 96vw)",
     borderRadius: 18,
     border: "1px solid rgba(255, 255, 255, 0.34)",
-    background: "rgba(255,255,255,0.10)", // 👈 translucent
+    background: "rgba(255,255,255,0.18)", // 👈 translucent
     backdropFilter: "blur(8px)",          // 👈 glass effect (supported browsers)
     WebkitBackdropFilter: "blur(8px)",     // 👈 Safari
     overflow: "hidden",
@@ -1134,12 +1166,7 @@ export default function HomePage() {
                   <select
                     value={genre}
                     onChange={(e) => setGenre(e.target.value)}
-                    style={{
-                      padding: "12px 12px",
-                      borderRadius: 12,
-                      border: "1px solid #ddd",
-                      fontWeight: 800,
-                     }}
+                    className="sl-select"
                   >
                     {(genreOptions.length ? genreOptions : [""]).map((g) => (
                       <option key={g || "any"} value={g}>
@@ -1231,12 +1258,7 @@ export default function HomePage() {
                     <select
                       value={country}
                       onChange={(e) => pickCountry(e.target.value)}
-                      style={{
-                        padding: "12px 12px",
-                        borderRadius: 12,
-                        border: "1px solid #ddd",
-                        fontWeight: 800,
-                      }}
+                      className="sl-select"
                     >
                       <option value="">Any country</option>
                       {COUNTRY_OPTIONS.map((c) => (
@@ -1252,12 +1274,7 @@ export default function HomePage() {
                       <select
                         value={province}
                         onChange={(e) => pickProvince(e.target.value)}
-                        style={{
-                          padding: "12px 12px",
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontWeight: 800,
-                        }}
+                        className="sl-select"
                       >
                         <option value="">Any province</option>
                         {(PROVINCES_BY_COUNTRY[country || "Canada"] ?? PROVINCES_BY_COUNTRY["Canada"]).map((p) => (
@@ -1309,13 +1326,8 @@ export default function HomePage() {
                       <select
                         value={city}
                         onChange={(e) => pickCity(e.target.value)}
-                        style={{
-                          padding: "12px 12px",
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontWeight: 800,
-                        }}
-                      >
+                        className="sl-select"
+                    >
                         <option value="">Any city</option>
                         {(CITIES_BY_PROVINCE[province] ?? []).map((c) => (
                           <option key={c} value={c}>
@@ -1379,13 +1391,8 @@ export default function HomePage() {
                       <select
                         value={neighbourhood}
                         onChange={(e) => pickNeighbourhood(e.target.value)}
-                        style={{
-                          padding: "12px 12px",
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          fontWeight: 800,
-                        }}
-                      >
+                        className="sl-select"
+                    >
                         <option value="">Any neighbourhood</option>
                         {(NEIGHBOURHOODS_BY_CITY[city] ?? []).map((n) => (
                           <option key={n} value={n}>
@@ -1436,20 +1443,46 @@ export default function HomePage() {
                 </div>
 
                 {/* WHO */}
-                <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>Who?: search for specific band/song/event:</div>
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Band name (or song title)"
-                    style={{
-                      padding: "12px 12px",
-                      borderRadius: 12,
-                      border: "1px solid #ddd",
-                      fontWeight: 800,
-                    }}
-                  />
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
+                    Search:
+                  </div>
+
+                  {/* EVENT SEARCH (exact show name) */}
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
+                      Event search (exact show name):
+                    </div>
+
+                    <input
+                      value={eventShowName}
+                      onChange={(e) => setEventShowName(e.target.value.toUpperCase())}
+                      placeholder="EX: PUNK PARTY VOL 3"
+                      className="sl-input"
+                      title="Exact match. Saved in CAPS in events.note."
+                    />
+
+                    <div style={{ fontSize: 12, color: "white", opacity: 0.7, lineHeight: 1.35 }}>
+                      Tip: this loads only tracks submitted under that event name.
+                    </div>
+                  </div>
+
+                  {/* BAND/SONG SEARCH (normal radio mode helper) */}
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
+                      Band / song search:
+                    </div>
+
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Band name (or song title)"
+                      className="sl-input"
+                    />
+                  </div>
                 </div>
+
+
 
                 {/* Date + Offline (extras) */}
                 <div style={{ display: "grid", gap: 10 }}>
