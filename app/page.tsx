@@ -315,14 +315,10 @@ export default function HomePage() {
         .select("id, city, genre, show_date, note, flyer_path, track_id, created_at")
         .order("created_at", { ascending: false });
 
-      // If date chosen, filter by date
-      if (date) {
-        evQ = evQ.eq("show_date", date);
-      }
-
-      // If event show name typed, filter by EXACT match on events.note (stored in CAPS)
+      // If event show name typed, fetch candidates (DB may have old spacing)
+      // then we do the REAL exact check client-side using normSpaces + CAPS.
       if (cleanEventName) {
-        evQ = evQ.eq("note", cleanEventName);
+        evQ = evQ.ilike("note", `%${cleanEventName}%`);
       }
 
       const { data: evs, error: evErr } = await evQ;
