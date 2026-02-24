@@ -7,6 +7,18 @@ import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 import StreetLevelHeader from "./components/StreetLevelHeader";
 
+
+type EventRow = {
+  id: string;
+  city: string | null;
+  genre: string | null;
+  show_date: string;      // "YYYY-MM-DD"
+  note: string | null;    // event name
+  flyer_path: string | null;
+  track_id: string | null;
+  created_at: string;
+};
+
 type TrackRow = {
   id: string;
   title: string;
@@ -165,8 +177,15 @@ export default function HomePage() {
   const [eventGenreOptions, setEventGenreOptions] = useState<string[]>([]);
   const [eventCityOptions, setEventCityOptions] = useState<string[]>([]);
 
- const [tracks, setTracks] = useState<TrackView[]>([]);
+  const [tracks, setTracks] = useState<TrackView[]>([]);
   const [pendingFreshRound, setPendingFreshRound] = useState(false);
+
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState("");
+  const [calendarEvents, setCalendarEvents] = useState<EventRow[]>([]);
+
+
 
   // ✅ keep a stable list of genres we've seen so the dropdown never "shrinks"
   const [masterGenres, setMasterGenres] = useState<string[]>([]);
@@ -178,6 +197,7 @@ export default function HomePage() {
   // Autoplay handling
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const autoStartAfterEventPickRef = useRef(false);
 
   // UI: overlay / hero
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -266,7 +286,57 @@ export default function HomePage() {
     };
   }, []);
 
+async function loadCalendarEvents() {
+  setCalendarLoading(true);
+  setCalendarError("");
 
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, city, genre, show_date, note, flyer_path, track_id, created_at")
+    .order("show_date", { ascending: true });
+
+  setCalendarLoading(false);
+
+  if (error) {
+    setCalendarError(error.message);
+    setCalendarEvents([]);
+    return;
+  }
+
+  setCalendarEvents((data ?? []) as EventRow[]);
+}
+
+
+
+
+function pickEventAndPlay(ev: EventRow) {
+  const showName = normSpaces(ev.note ?? "").toUpperCase();
+
+  if (showName) {
+    setEventShowName(showName);
+    setDate(""); // use show-name mode
+  } else {
+    setEventShowName("");
+    setDate((ev.show_date ?? "").slice(0, 10));
+  }
+
+  if (ev.city) setCity(toTitleCaseSmart(ev.city));
+  if (ev.genre) setGenre(toTitleCaseSmart(ev.genre));
+
+  // stop current audio so the event starts clean
+  setNowPlaying(null);
+  setAutoplayBlocked(false);
+  if (audioRef.current) {
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+  }
+
+  setHasStarted(true);
+  setFiltersOpen(false);
+  setCalendarOpen(false);
+
+  autoStartAfterEventPickRef.current = true;
+}
   
 
   // keep URL in sync (nice for sharing)
@@ -303,6 +373,11 @@ export default function HomePage() {
     }
 
     setStatus("Loading...");
+
+
+
+
+
 
    // ===== EVENT RADIO MODE (date OR event show-name search) =====
     const cleanEventName = normSpaces(eventShowName || "").toUpperCase();
@@ -577,6 +652,23 @@ if (error) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered]);
+
+  // Auto-start after picking an event (wait until filtered/queue are ready)
+useEffect(() => {
+  if (!autoStartAfterEventPickRef.current) return;
+
+  if (!filtered.length) return;
+
+  setHasStarted(true);
+  setFiltersOpen(false);
+
+  if (!nowPlaying) {
+    go();
+  }
+
+  autoStartAfterEventPickRef.current = false;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [filtered.length]);
 
   // After a fresh server reload (RPC), auto-start a new round
   useEffect(() => {
@@ -871,6 +963,28 @@ if (error) {
                   >
                     Filters
                   </button>
+
+                  <button
+onClick={async () => {
+  setFiltersOpen(true);      // open overlay
+  setHasStarted(true);       // ensures header stays visible state-wise
+  setCalendarOpen(true);     // show list
+  await loadCalendarEvents();
+}}
+  style={{
+    padding: "12px 16px",
+    borderRadius: 12,
+    border: "1px solid #ddd",
+    fontWeight: 950,
+    background: "black",
+    color: "white",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  }}
+  title="Browse events"
+>
+  Calendar
+</button>
 
                   <Link
                     href="/band"
@@ -1475,6 +1589,86 @@ if (error) {
                   <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
                     Search:
                   </div>
+
+{/* CALENDAR (simple list for now) */}
+<div style={{ display: "grid", gap: 8 }}>
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+    <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
+      Calendar:
+    </div>
+
+    <button
+      type="button"
+      onClick={async () => {
+        const next = !calendarOpen;
+        setCalendarOpen(next);
+        if (next && !calendarEvents.length) await loadCalendarEvents();
+      }}
+      style={{
+        padding: "8px 12px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "black",
+        color: "white",
+        fontWeight: 900,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {calendarOpen ? "Hide" : "Show"}
+    </button>
+  </div>
+
+  {calendarOpen ? (
+    <div
+      style={{
+        border: "1px solid rgba(255,255,255,0.25)",
+        borderRadius: 14,
+        padding: 10,
+        display: "grid",
+        gap: 8,
+        background: "rgba(0,0,0,0.25)",
+      }}
+    >
+      {calendarLoading ? <div style={{ color: "white", opacity: 0.8 }}>Loading events…</div> : null}
+      {calendarError ? <div style={{ color: "white", opacity: 0.8 }}>Error: {calendarError}</div> : null}
+
+      {!calendarLoading && !calendarError && !calendarEvents.length ? (
+        <div style={{ color: "white", opacity: 0.8 }}>No events yet.</div>
+      ) : null}
+
+      {calendarEvents.slice(0, 60).map((ev) => {
+        const d = (ev.show_date ?? "").slice(0, 10);
+        const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
+        const meta = `${ev.city ?? "—"} • ${ev.genre ?? "—"}`;
+
+        return (
+          <button
+            key={ev.id}
+            type="button"
+            onClick={() => pickEventAndPlay(ev)}
+            style={{
+              textAlign: "left",
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.25)",
+              background: "rgba(255,255,255,0.12)",
+              color: "white",
+              cursor: "pointer",
+            }}
+            title="Pick this event and start playing"
+          >
+            <div style={{ fontWeight: 950 }}>{d} — {name}</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>{meta}</div>
+          </button>
+        );
+      })}
+    </div>
+  ) : null}
+</div>
+
+
 
                   {/* EVENT SEARCH (exact show name) */}
                   <div style={{ display: "grid", gap: 6 }}>
