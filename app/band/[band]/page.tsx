@@ -213,6 +213,7 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
   // Lightbox state (Gallery)
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -1809,6 +1810,8 @@ const genre = getEventGenreFromTrackId(eventTrackId, tracks);
                   const trackTitle = (ev.track_id && tracks.find((t) => t.id === ev.track_id)?.title) || "—";
                   const flyer = withCacheBust(getFlyerUrl(ev.flyer_path));
 
+                  const showLink = buildShowLink(ev.note);
+
                    return (
                     <div
                       key={ev.id}
@@ -1868,76 +1871,30 @@ const genre = getEventGenreFromTrackId(eventTrackId, tracks);
                         </div>
                       </div>
 
-{(() => {
-  const showLink = buildShowLink(ev.note);
-
-  return (
-    <div style={{ display: "grid", justifyItems: "end", gap: 10 }}>
-{showLink ? (
-  <div style={{ textAlign: "right", maxWidth: 260 }}>
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(showLink);
-        } catch {
-          // fallback for older browsers / weird permissions
-          const ta = document.createElement("textarea");
-          ta.value = showLink;
-          ta.style.position = "fixed";
-          ta.style.left = "-9999px";
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand("copy");
-          document.body.removeChild(ta);
-        }
-        setEventStatus("✅ Copied show link!");
-        setTimeout(() => setEventStatus(""), 1200);
-      }}
-      style={{
-        padding: "6px 10px",
-        borderRadius: 10,
-        border: "1px solid #ccc",
-        background: "black",
-        color: "white",
-        fontWeight: 900,
-        cursor: "pointer",
-        fontSize: 12,
-        justifySelf: "end",
-      }}
-      title="Copy this show link"
-    >
-      Copy show link
-    </button>
-
-    <a
-      href={showLink}
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        fontSize: 12,
-        fontWeight: 900,
-        textDecoration: "underline",
-        wordBreak: "break-all",
-        display: "inline-block",
-        marginTop: 6,
-        color: "black",
-      }}
-      title="Open this show on Event Radio"
-    >
-      {showLink}
-    </a>
-  </div>
-) : (
-  <div style={{ fontSize: 12, opacity: 0.6, textAlign: "right", maxWidth: 260 }}>
-    <div style={{ fontWeight: 900 }}>Show link</div>
-    <div>(add a show name to generate a link)</div>
-  </div>
-)}
-
+<div style={{ display: "grid", justifyItems: "end", gap: 10 }}>
+  {showLink ? (
+    <div style={{ textAlign: "right", maxWidth: 260 }}>
       <button
         type="button"
-        onClick={() => deleteEvent(ev)}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(showLink);
+          } catch {
+            const ta = document.createElement("textarea");
+            ta.value = showLink;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+          }
+
+          setCopiedEventId(ev.id);
+          setTimeout(() => {
+            setCopiedEventId((prev) => (prev === ev.id ? null : prev));
+          }, 1200);
+        }}
         style={{
           padding: "8px 12px",
           borderRadius: 10,
@@ -1948,13 +1905,54 @@ const genre = getEventGenreFromTrackId(eventTrackId, tracks);
           whiteSpace: "nowrap",
           cursor: "pointer",
         }}
-        title="Delete this show submission"
+        title="Copy this show link"
       >
-        Delete
+        {copiedEventId === ev.id ? "Copied!" : "Copy show link"}
       </button>
+
+      <a
+        href={showLink}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          fontSize: 12,
+          fontWeight: 900,
+          textDecoration: "underline",
+          wordBreak: "break-all",
+          display: "inline-block",
+          marginTop: 6,
+          color: "black",
+        }}
+        title="Open this show on Event Radio"
+      >
+        {showLink}
+      </a>
     </div>
-  );
-})()}
+  ) : (
+    <div style={{ fontSize: 12, opacity: 0.6, textAlign: "right", maxWidth: 260 }}>
+      <div style={{ fontWeight: 900 }}>Show link</div>
+      <div>(add a show name to generate a link)</div>
+    </div>
+  )}
+
+  <button
+    type="button"
+    onClick={() => deleteEvent(ev)}
+    style={{
+      padding: "8px 12px",
+      borderRadius: 10,
+      border: "1px solid #ccc",
+      background: "black",
+      color: "white",
+      fontWeight: 900,
+      whiteSpace: "nowrap",
+      cursor: "pointer",
+    }}
+    title="Delete this show submission"
+  >
+    Delete
+  </button>
+</div>
                     </div>
                   );
                 })}
