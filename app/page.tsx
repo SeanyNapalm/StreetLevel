@@ -420,19 +420,46 @@ export default function HomePage() {
     setEventGenreOptions([]);
     setEventCityOptions([]);
 
-    const { data, error } = await supabase.rpc("radio_pick_one_per_band_filtered", {
-      p_country: country || null,
-      p_province: province || null,
-      p_city: city || null,
-      p_neighbourhood: neighbourhood || null,
-      p_genre: genre || null,
-      p_q: q || null,
-    });
+    
 
-    if (error) {
-      setStatus(`Load error: ${error.message}`);
-      return;
-    }
+const qRaw = q ?? "";
+const qClean = normSpaces(qRaw).trim();
+const qSlug = qClean.replace(/\s+/g, "-"); // "1st show" -> "1st-show"
+
+// 1) try normal
+let { data, error } = await supabase.rpc("radio_pick_one_per_band_filtered", {
+  p_country: country || null,
+  p_province: province || null,
+  p_city: city || null,
+  p_neighbourhood: neighbourhood || null,
+  p_genre: genre || null,
+  p_q: qClean || null,
+});
+
+// 2) if empty AND we transformed spaces -> hyphens, retry with slug
+if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
+  const retry = await supabase.rpc("radio_pick_one_per_band_filtered", {
+    p_country: country || null,
+    p_province: province || null,
+    p_city: city || null,
+    p_neighbourhood: neighbourhood || null,
+    p_genre: genre || null,
+    p_q: qSlug || null,
+  });
+
+  // only overwrite if retry succeeded
+  if (!retry.error) {
+    data = retry.data;
+    error = retry.error;
+  } else {
+    error = retry.error;
+  }
+}
+
+if (error) {
+  setStatus(`Load error: ${error.message}`);
+  return;
+}
 
     const mapped: TrackView[] = (data ?? []).map((r: TrackRow) => ({
       ...r,
