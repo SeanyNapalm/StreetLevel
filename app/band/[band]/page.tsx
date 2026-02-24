@@ -126,6 +126,17 @@ function safeFileName(name: string) {
   return (name || "file").replace(/[^a-zA-Z0-9._-]+/g, "_");
 }
 
+// Build an Event Radio link for this show name (events.note)
+const PUBLIC_BASE =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_PUBLIC_URL ||
+  "https://streetlevel.live";
+
+function buildShowLink(showName: string | null) {
+  const clean = normSpaces(showName || "").toUpperCase();
+  if (!clean) return "";
+  return `${PUBLIC_BASE}/?event=${encodeURIComponent(clean)}`;
+}
 export default function BandDashboard({ params }: { params: Promise<{ band: string }> }) {
   const router = useRouter();
   const p = use(params);
@@ -1849,23 +1860,59 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => deleteEvent(ev)}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 10,
-                          border: "1px solid #ccc",
-                          background: "black",
-                          color: "white",
-                          fontWeight: 900,
-                          whiteSpace: "nowrap",
-                          cursor: "pointer",
-                        }}
-                        title="Delete this show submission"
-                      >
-                        Delete
-                      </button>
+{(() => {
+  const showLink = buildShowLink(ev.note);
+
+  return (
+    <div style={{ display: "grid", justifyItems: "end", gap: 10 }}>
+      {showLink ? (
+        <div style={{ textAlign: "right", maxWidth: 260 }}>
+          <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>Show Link</div>
+          <a
+            href={showLink}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              fontSize: 12,
+              fontWeight: 900,
+              textDecoration: "underline",
+              wordBreak: "break-all",
+              display: "inline-block",
+              marginTop: 4,
+              color: "black",
+            }}
+            title="Open this show on Event Radio"
+          >
+            {showLink}
+          </a>
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, opacity: 0.6, textAlign: "right", maxWidth: 260 }}>
+          <div style={{ fontWeight: 900 }}>Show Link</div>
+          <div>(add a show name to generate a link)</div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => deleteEvent(ev)}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 10,
+          border: "1px solid #ccc",
+          background: "black",
+          color: "white",
+          fontWeight: 900,
+          whiteSpace: "nowrap",
+          cursor: "pointer",
+        }}
+        title="Delete this show submission"
+      >
+        Delete
+      </button>
+    </div>
+  );
+})()}
                     </div>
                   );
                 })}
