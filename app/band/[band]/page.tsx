@@ -137,6 +137,14 @@ function buildShowLink(showName: string | null) {
   if (!clean) return "";
   return `${PUBLIC_BASE}/?event=${encodeURIComponent(clean)}`;
 }
+
+// ✅ Event genre should match the selected showcase track (fallback to Punk)
+function getEventGenreFromTrackId(trackId: string, tracks: TrackView[]) {
+  const t = tracks.find((x) => x.id === trackId);
+  const g = normSpaces(t?.genre || "");
+  return g ? toTitleCaseSmart(g) : "Punk";
+}
+
 export default function BandDashboard({ params }: { params: Promise<{ band: string }> }) {
   const router = useRouter();
   const p = use(params);
@@ -666,8 +674,8 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
       setFlyerPath(storagePath);
 
-      const city = toTitleCaseSmart(profileCity) || "Ottawa";
-      const genre = "Punk";
+const city = toTitleCaseSmart(profileCity) || "Ottawa";
+const genre = getEventGenreFromTrackId(eventTrackId, tracks);
 
       const cleanShowName = normSpaces(showName).toUpperCase();
 
@@ -707,8 +715,8 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
     setEventStatus("Submitting your band for this event...");
 
     try {
-      const city = toTitleCaseSmart(profileCity) || "Ottawa";
-      const genre = "Punk";
+const city = toTitleCaseSmart(profileCity) || "Ottawa";
+const genre = getEventGenreFromTrackId(eventTrackId, tracks);
 
       const cleanShowName = normSpaces(showName).toUpperCase();
 
@@ -1865,33 +1873,67 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
   return (
     <div style={{ display: "grid", justifyItems: "end", gap: 10 }}>
-      {showLink ? (
-        <div style={{ textAlign: "right", maxWidth: 260 }}>
-          <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>Show Link</div>
-          <a
-            href={showLink}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              fontSize: 12,
-              fontWeight: 900,
-              textDecoration: "underline",
-              wordBreak: "break-all",
-              display: "inline-block",
-              marginTop: 4,
-              color: "black",
-            }}
-            title="Open this show on Event Radio"
-          >
-            {showLink}
-          </a>
-        </div>
-      ) : (
-        <div style={{ fontSize: 12, opacity: 0.6, textAlign: "right", maxWidth: 260 }}>
-          <div style={{ fontWeight: 900 }}>Show Link</div>
-          <div>(add a show name to generate a link)</div>
-        </div>
-      )}
+{showLink ? (
+  <div style={{ textAlign: "right", maxWidth: 260 }}>
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(showLink);
+        } catch {
+          // fallback for older browsers / weird permissions
+          const ta = document.createElement("textarea");
+          ta.value = showLink;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        setEventStatus("✅ Copied show link!");
+        setTimeout(() => setEventStatus(""), 1200);
+      }}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid #ccc",
+        background: "black",
+        color: "white",
+        fontWeight: 900,
+        cursor: "pointer",
+        fontSize: 12,
+        justifySelf: "end",
+      }}
+      title="Copy this show link"
+    >
+      Copy show link
+    </button>
+
+    <a
+      href={showLink}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        fontSize: 12,
+        fontWeight: 900,
+        textDecoration: "underline",
+        wordBreak: "break-all",
+        display: "inline-block",
+        marginTop: 6,
+        color: "black",
+      }}
+      title="Open this show on Event Radio"
+    >
+      {showLink}
+    </a>
+  </div>
+) : (
+  <div style={{ fontSize: 12, opacity: 0.6, textAlign: "right", maxWidth: 260 }}>
+    <div style={{ fontWeight: 900 }}>Show link</div>
+    <div>(add a show name to generate a link)</div>
+  </div>
+)}
 
       <button
         type="button"
