@@ -1435,29 +1435,56 @@ const calendarMatches = useMemo(() => {
   </div>
 ) : null}
 
-                  {whereStep === "city" ? (
-                    <div style={{ display: "grid", gap: 8 }}>
-                      <select value={city} onChange={(e) => pickCity(e.target.value)} className="sl-select">
-                        <option value="">Any city</option>
-                        {(CITIES_BY_PROVINCE[province] ?? []).map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                        {date
-                          ? cityOptions
-                              .filter((x) => x)
-                              .map((c) => (
-                                <option key={`ev-${c}`} value={c}>
-                                  {c}
-                                </option>
-                              ))
-                          : null}
-                      </select>
+{whereStep === "city" ? (
+  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+      <select
+        value={city}
+        onChange={(e) => pickCity(e.target.value)}
+        className="sl-select"
+        style={{ width: "100%" }}
+      >
+        <option value="">Any city</option>
 
+        {(CITIES_BY_PROVINCE[province] ?? []).map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
 
-                    </div>
-                  ) : null}
+        {date
+          ? cityOptions
+              .filter((x) => x)
+              .map((c) => (
+                <option key={`ev-${c}`} value={c}>
+                  {c}
+                </option>
+              ))
+          : null}
+      </select>
+    </div>
+
+    <button
+      type="button"
+      onClick={clearLocation}
+      disabled={!country && !province && !city && !neighbourhood}
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "black",
+        color: "#2bff00",
+        fontWeight: 950,
+        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+        whiteSpace: "nowrap",
+        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+      }}
+      title="Clear all location filters"
+    >
+      Clear
+    </button>
+  </div>
+) : null}
 
 {whereStep === "neighbourhood" ? (
   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
