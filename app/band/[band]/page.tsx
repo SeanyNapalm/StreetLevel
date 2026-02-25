@@ -8,6 +8,8 @@ import StreetLevelHeader from "../../components/StreetLevelHeader";
 type EventRow = {
   id: string;
   band_slug: string;
+  country: string | null;   // ✅ NEW
+  province: string | null;  // ✅ NEW
   city: string;
   genre: string;
   show_date: string;
@@ -302,7 +304,7 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
     const { data, error } = await supabase
       .from("events")
-      .select("id,band_slug,city,genre,show_date,flyer_path,track_id,note,created_at")
+      .select("id,band_slug,country,province,city,genre,show_date,flyer_path,track_id,note,created_at")
       .eq("band_slug", bandSlug)
       .gte("show_date", today)
       .order("show_date", { ascending: true })
@@ -675,6 +677,8 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
       setFlyerPath(storagePath);
 
+const country = toTitleCaseSmart(profileCountry) || "Canada";
+const province = toTitleCaseSmart(profileProvince) || "Ontario";
 const city = toTitleCaseSmart(profileCity) || "Ottawa";
 const genre = getEventGenreFromTrackId(eventTrackId, tracks);
 
@@ -716,6 +720,8 @@ const genre = getEventGenreFromTrackId(eventTrackId, tracks);
     setEventStatus("Submitting your band for this event...");
 
     try {
+const country = toTitleCaseSmart(profileCountry) || "Canada";
+const province = toTitleCaseSmart(profileProvince) || "Ontario";
 const city = toTitleCaseSmart(profileCity) || "Ottawa";
 const genre = getEventGenreFromTrackId(eventTrackId, tracks);
 
@@ -723,6 +729,8 @@ const genre = getEventGenreFromTrackId(eventTrackId, tracks);
 
       const payload = {
         band_slug: bandSlug,
+        country,      // ✅ NEW
+        province,     // ✅ NEW
         city,
         genre,
         show_date: showDate,

@@ -7,6 +7,11 @@ import StreetLevelHeader from "./components/StreetLevelHeader";
 
 type EventRow = {
   id: string;
+
+  // ✅ NEW (events table now stores these)
+  country: string | null;
+  province: string | null;
+
   city: string | null;
   genre: string | null;
   show_date: string; // "YYYY-MM-DD"
@@ -290,26 +295,38 @@ export default function HomePage() {
     };
   }, []);
 
-  function pickEventAndPlay(ev: EventRow) {
-    const showName = normSpaces(ev.note ?? "").toUpperCase();
-    if (showName) {
-      setEventShowName(showName);
-      setDate(""); // use show-name mode
-    } else {
-      // fallback to date mode if note is missing
-      setEventShowName("");
-      setDate((ev.show_date ?? "").slice(0, 10));
-    }
-
-    if (ev.city) setCity(toTitleCaseSmart(ev.city));
-    if (ev.genre) setGenre(toTitleCaseSmart(ev.genre));
-
-    setHasStarted(true);
-    setFiltersOpen(false);
-    setCalendarOpen(false);
-
-    autoStartAfterEventPickRef.current = true;
+function pickEventAndPlay(ev: EventRow) {
+  const showName = normSpaces(ev.note ?? "").toUpperCase();
+  if (showName) {
+    setEventShowName(showName);
+    setDate(""); // use show-name mode
+  } else {
+    // fallback to date mode if note is missing
+    setEventShowName("");
+    setDate((ev.show_date ?? "").slice(0, 10));
   }
+
+  // ✅ Apply event’s stored location/genre (if present)
+  if (ev.country) setCountry(toTitleCaseSmart(ev.country));
+  if (ev.province) setProvince(toTitleCaseSmart(ev.province));
+  if (ev.city) setCity(toTitleCaseSmart(ev.city));
+  if (ev.genre) setGenre(toTitleCaseSmart(ev.genre));
+
+  // ✅ Optional: clear band/song search so event mode feels clean
+  setQ("");
+
+  // ✅ Ensure the progressive WHERE UI is at the deepest available level
+  if (ev.city) setWhereStep("neighbourhood");
+  else if (ev.province) setWhereStep("city");
+  else if (ev.country) setWhereStep("province");
+  else setWhereStep("country");
+
+  setHasStarted(true);
+  setFiltersOpen(false);
+  setCalendarOpen(false);
+
+  autoStartAfterEventPickRef.current = true;
+}
 
   // keep URL in sync (nice for sharing)
   function syncUrl() {
@@ -338,51 +355,63 @@ export default function HomePage() {
   }
 
   // ✅ Load calendar events once (upcoming filtering happens client-side)
-  async function loadCalendarEvents() {
-    setCalendarLoading(true);
-    setCalendarError("");
+async function loadCalendarEvents() {
+  setCalendarLoading(true);
+  setCalendarError("");
 
-    const { data, error } = await supabase
-      .from("events")
-      .select("id, city, genre, show_date, note, flyer_path, track_id, created_at")
-      .order("show_date", { ascending: true });
+  const today = localTodayISO();
 
-    setCalendarLoading(false);
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, country, province, city, genre, show_date, note, flyer_path, track_id, created_at")
+    .gte("show_date", today) // ✅ future-only at the DB level
+    .order("show_date", { ascending: true })
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      setCalendarError(error.message);
-      setCalendarEvents([]);
-      return;
-    }
+  setCalendarLoading(false);
 
-    setCalendarEvents((data ?? []) as EventRow[]);
+  if (error) {
+    setCalendarError(error.message);
+    setCalendarEvents([]);
+    return;
   }
 
+  setCalendarEvents((data ?? []) as EventRow[]);
+}
+
   // ✅ Only show upcoming events + only those matching current filters
-  const calendarMatches = useMemo(() => {
-    const today = localTodayISO();
+const calendarMatches = useMemo(() => {
+  const today = localTodayISO();
 
-    const cc = city.trim().toLowerCase();
-    const gg = genre.trim().toLowerCase();
+  const co = country.trim().toLowerCase();
+  const pr = province.trim().toLowerCase();
+  const cc = city.trim().toLowerCase();
+  const gg = genre.trim().toLowerCase();
 
-    return calendarEvents
-      .filter((ev) => {
-        const d = (ev.show_date ?? "").slice(0, 10);
-        if (!d) return false;
+  return calendarEvents
+    .filter((ev) => {
+      const d = (ev.show_date ?? "").slice(0, 10);
+      if (!d) return false;
 
-        // ✅ upcoming only (today or future)
-        if (d < today) return false;
+      // ✅ upcoming only (today or future)
+      if (d < today) return false;
 
-        const evCity = (ev.city ?? "").toLowerCase();
-        const evGenre = (ev.genre ?? "").toLowerCase();
+      const evCountry = (ev.country ?? "").toLowerCase();
+      const evProvince = (ev.province ?? "").toLowerCase();
+      const evCity = (ev.city ?? "").toLowerCase();
+      const evGenre = (ev.genre ?? "").toLowerCase();
 
-        const matchCity = !cc || evCity.includes(cc);
-        const matchGenre = !gg || evGenre.includes(gg);
+      // ✅ If user picked a filter, event must match it.
+      // Use includes() so “Ottawa” matches “Ottawa (Downtown)” etc.
+      const matchCountry = !co || evCountry.includes(co);
+      const matchProvince = !pr || evProvince.includes(pr);
+      const matchCity = !cc || evCity.includes(cc);
+      const matchGenre = !gg || evGenre.includes(gg);
 
-        return matchCity && matchGenre;
-      })
-      .slice(0, 200);
-  }, [calendarEvents, city, genre]);
+      return matchCountry && matchProvince && matchCity && matchGenre;
+    })
+    .slice(0, 200);
+}, [calendarEvents, country, province, city, genre]);
 
   // ============== DATA LOAD ==============
   async function loadTracks() {
@@ -1701,7 +1730,7 @@ export default function HomePage() {
               {calendarMatches.map((ev) => {
                 const d = (ev.show_date ?? "").slice(0, 10);
                 const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
-                const meta = `${ev.city ?? "—"} • ${ev.genre ?? "—"}`;
+  const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
 
                 return (
                   <button
