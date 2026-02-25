@@ -33,13 +33,23 @@ type BandUserProfileRow = {
 type EventRow = {
   id: string;
   band_slug: string;
-  city: string;
-  genre: string;
+
+  // ✅ new snapshot fields (match radio filters)
+  country: string | null;
+  province: string | null;
+  neighbourhood: string | null;
+
+  city: string | null;
+  genre: string | null;
+
   show_date: string; // YYYY-MM-DD
+  note: string | null; // show name (events.note)
+
   flyer_path: string | null;
   track_id: string | null;
   created_at: string;
 };
+
 
 type GalleryItem = {
   name: string;
@@ -92,6 +102,50 @@ function prettyFromSlug(slug: string) {
     .join(" ");
 }
 
+function norm(s: string | null | undefined) {
+  return (s ?? "").trim();
+}
+
+function normSpaces(s: string | null | undefined) {
+  return (s ?? "").replace(/\s+/g, " ").trim();
+}
+
+function toUpperEventName(s: string | null | undefined) {
+  return normSpaces(s).toUpperCase();
+}
+
+function buildEventLink(ev: EventRow) {
+  // Prefer exact event name mode (/?event=NAME) because it’s the cleanest UX
+  const name = toUpperEventName(ev.note);
+
+  // Use the live site origin when deployed, localhost when local
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+  if (name) {
+    return `${origin}/?event=${encodeURIComponent(name)}`;
+  }
+
+  // Fallback: date-mode link (works with your radio page logic)
+  const d = (ev.show_date ?? "").slice(0, 10);
+
+  const params = new URLSearchParams();
+  if (d) params.set("date", d);
+  if (norm(ev.city)) params.set("city", norm(ev.city));
+  if (norm(ev.genre)) params.set("genre", norm(ev.genre));
+
+  return `${origin}/?${params.toString()}`;
+}
+
+function prettyEventWhere(ev: EventRow) {
+  // country / province / city / neighbourhood (only show what exists)
+  const parts = [ev.country, ev.province, ev.city, ev.neighbourhood]
+    .map((x) => norm(x))
+    .filter(Boolean);
+
+  return parts.length ? parts.join(" • ") : "—";
+}
+
+
 export default function PublicBandPage({
   params,
 }: {
@@ -129,6 +183,7 @@ async function buyTrack(track: TrackView) {
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [copiedEventId, setCopiedEventId] = useState<string>("");
 
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
@@ -225,9 +280,9 @@ const { data, error } = await supabase
 
     const { data, error } = await supabase
       .from("events")
-      .select(
-        "id,band_slug,city,genre,show_date,flyer_path,track_id,created_at"
-      )
+.select(
+  "id,band_slug,country,province,neighbourhood,city,genre,show_date,note,flyer_path,track_id,created_at"
+)
       .eq("band_slug", bandSlug)
       .gte("show_date", todayStr)
       .order("show_date", { ascending: true })
@@ -646,65 +701,116 @@ useEffect(() => {
                 const trackTitle =
                   (ev.track_id && tracks.find((t) => t.id === ev.track_id)?.title) || "—";
 
-                return (
-                  <div
-                    key={ev.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "64px 1fr",
-                      gap: 10,
-                      alignItems: "center",
-                      border: "1px solid #eee",
-                      borderRadius: 14,
-                      padding: 10,
-                    }}
-                  >
-                    {flyer ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={flyer}
-                        alt="flyer"
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: 12,
-                          objectFit: "cover",
-                          border: "1px solid #eee",
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: 12,
-                          border: "1px solid #eee",
-                          opacity: 0.35,
-                        }}
-                      />
-                    )}
+return (
+  <div
+    key={ev.id}
+    style={{
+      display: "grid",
+      gridTemplateColumns: "64px 1fr auto",
+      gap: 10,
+      alignItems: "center",
+      border: "1px solid #eee",
+      borderRadius: 14,
+      padding: 10,
+    }}
+  >
+    {flyer ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={flyer}
+        alt="flyer"
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 12,
+          objectFit: "cover",
+          border: "1px solid #eee",
+        }}
+      />
+    ) : (
+      <div
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 12,
+          border: "1px solid #eee",
+          opacity: 0.35,
+        }}
+      />
+    )}
 
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 950 }}>{ev.show_date}</div>
-                      <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
-                        {ev.city} • {ev.genre}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          opacity: 0.75,
-                          marginTop: 4,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                        title={trackTitle}
-                      >
-                        Showcase: <b>{trackTitle}</b>
-                      </div>
-                    </div>
-                  </div>
-                );
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontWeight: 950 }}>
+        {(ev.show_date ?? "").slice(0, 10)} — {normSpaces(ev.note) || "(Unnamed event)"}
+      </div>
+
+      <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
+        {prettyEventWhere(ev)} • {(ev.genre ?? "—")}
+      </div>
+
+      <div
+        style={{
+          fontSize: 12,
+          opacity: 0.75,
+          marginTop: 4,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+        title={trackTitle}
+      >
+        Showcase: <b>{trackTitle}</b>
+      </div>
+
+      {/* ✅ clickable event link */}
+      <div style={{ marginTop: 8 }}>
+        <a
+          href={buildEventLink(ev)}
+          style={{
+            fontSize: 12,
+            fontWeight: 900,
+            textDecoration: "underline",
+            color: "black",
+            wordBreak: "break-all",
+          }}
+          title="Open this event radio link"
+        >
+          {buildEventLink(ev)}
+        </a>
+      </div>
+    </div>
+
+    {/* ✅ Copy link button */}
+    <button
+      type="button"
+      onClick={async () => {
+        const link = buildEventLink(ev);
+        try {
+          await navigator.clipboard.writeText(link);
+          setCopiedEventId(ev.id);
+          window.setTimeout(() => setCopiedEventId(""), 1200);
+        } catch {
+          // fallback if clipboard API is blocked
+          window.prompt("Copy this link:", link);
+        }
+      }}
+      style={{
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid #000",
+        background: "black",
+        color: "#2bff00",
+        fontWeight: 900,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        height: "fit-content",
+      }}
+      title="Copy event link"
+    >
+      {copiedEventId === ev.id ? "Copied!" : "Copy link"}
+    </button>
+  </div>
+);
               })}
 
               {events.length > 10 ? (

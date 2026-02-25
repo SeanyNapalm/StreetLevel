@@ -300,7 +300,11 @@ export default function BandDashboard({ params }: { params: Promise<{ band: stri
 
     setEventsLoading(true);
 
-    const today = new Date().toISOString().slice(0, 10);
+const d = new Date();
+const yyyy = d.getFullYear();
+const mm = String(d.getMonth() + 1).padStart(2, "0");
+const dd = String(d.getDate()).padStart(2, "0");
+const today = `${yyyy}-${mm}-${dd}`;
 
     const { data, error } = await supabase
       .from("events")
