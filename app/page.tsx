@@ -41,6 +41,10 @@ type TrackRow = {
 
 type TrackView = TrackRow & { url: string; artUrl: string; flyerUrl?: string };
 
+
+
+
+
 function getPublicUrl(path: string) {
   const res = supabase.storage.from("tracks").getPublicUrl(path);
   return res?.data?.publicUrl ?? "";
@@ -294,6 +298,17 @@ export default function HomePage() {
       window.clearTimeout(t2);
     };
   }, []);
+
+const LOCATION_SELECT_MAX = 430;
+
+function clearLocation() {
+  setCountry("");
+  setProvince("");
+  setCity("");
+  setNeighbourhood("");
+  setWhereStep("country");
+}
+
 
 function pickEventAndPlay(ev: EventRow) {
   const showName = normSpaces(ev.note ?? "").toUpperCase();
@@ -1295,133 +1310,130 @@ const calendarMatches = useMemo(() => {
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>From Where?:</div>
 
-                  {prettyBreadcrumb.length ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 8,
-                        alignItems: "center",
-                        fontSize: 12,
-                        opacity: 0.9,
-                      }}
-                    >
-                      {prettyBreadcrumb.map((p, idx) => {
-                        const isLast = idx === prettyBreadcrumb.length - 1;
-                        return (
-                          <button
-                            key={`${p}-${idx}`}
-                            type="button"
-                            onClick={() => {
-                              if (idx === 0) resetBelow("country");
-                              if (idx === 1) resetBelow("province");
-                              if (idx === 2) resetBelow("city");
-                              if (idx === 3) resetBelow("neighbourhood");
-                            }}
-                            style={{
-                              padding: "6px 10px",
-                              borderRadius: 999,
-                              border: "1px solid #ddd",
-                              background: isLast ? "black" : "white",
-                              color: isLast ? "white" : "black",
-                              fontWeight: 900,
-                              cursor: "pointer",
-                            }}
-                            title="Tap to go back / change this level"
-                          >
-                            {p}
-                          </button>
-                        );
-                      })}
+{prettyBreadcrumb.length ? (
+  <div
+    style={{
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      alignItems: "center",
+      fontSize: 12,
+      opacity: 0.9,
+    }}
+  >
+    {prettyBreadcrumb.map((p, idx) => {
+      const isLast = idx === prettyBreadcrumb.length - 1;
+      return (
+        <button
+          key={`${p}-${idx}`}
+          type="button"
+          onClick={() => {
+            if (idx === 0) resetBelow("country");
+            if (idx === 1) resetBelow("province");
+            if (idx === 2) resetBelow("city");
+            if (idx === 3) resetBelow("neighbourhood");
+          }}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 999,
+            border: "1px solid #ddd",
+            background: isLast ? "black" : "white",
+            color: isLast ? "white" : "black",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+          title="Tap to go back / change this level"
+        >
+          {p}
+        </button>
+      );
+    })}
+  </div>
+) : (
+  <div style={{ fontSize: 12, color: "white", opacity: 0.65 }}>
+    Optional. Pick country/province/city/neighbourhood… or leave blank.
+  </div>
+)}
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCountry("");
-                          setProvince("");
-                          setCity("");
-                          setNeighbourhood("");
-                          setWhereStep("country");
-                        }}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 999,
-                          border: "1px solid #ddd",
-                          background: "white",
-                          color: "black",
-                          fontWeight: 900,
-                          cursor: "pointer",
-                          opacity: 0.8,
-                        }}
-                        title="Clear location"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: "white", opacity: 0.65 }}>
-                      Optional. Pick country/province/city/neighbourhood… or leave blank.
-                    </div>
-                  )}
+{whereStep === "country" ? (
+  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+      <select
+        value={country}
+        onChange={(e) => pickCountry(e.target.value)}
+        className="sl-select"
+        style={{ width: "100%" }}
+      >
+        <option value="">Any country</option>
+        {COUNTRY_OPTIONS.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+    </div>
 
-                  {whereStep === "country" ? (
-                    <select value={country} onChange={(e) => pickCountry(e.target.value)} className="sl-select">
-                      <option value="">Any country</option>
-                      {COUNTRY_OPTIONS.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
+    <button
+      type="button"
+      onClick={clearLocation}
+      disabled={!country && !province && !city && !neighbourhood}
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "black",
+        color: "#2bff00",
+        fontWeight: 950,
+        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+        whiteSpace: "nowrap",
+        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+      }}
+      title="Clear all location filters"
+    >
+      Clear
+    </button>
+  </div>
+) : null}
 
-                  {whereStep === "province" ? (
-                    <div style={{ display: "grid", gap: 8 }}>
-                      <select value={province} onChange={(e) => pickProvince(e.target.value)} className="sl-select">
-                        <option value="">Any province</option>
-                        {(PROVINCES_BY_COUNTRY[country || "Canada"] ?? PROVINCES_BY_COUNTRY["Canada"]).map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
+{whereStep === "province" ? (
+  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+      <select
+        value={province}
+        onChange={(e) => pickProvince(e.target.value)}
+        className="sl-select"
+        style={{ width: "100%" }}
+      >
+        <option value="">Any province</option>
+        {(PROVINCES_BY_COUNTRY[country || "Canada"] ?? PROVINCES_BY_COUNTRY["Canada"]).map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
+    </div>
 
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          onClick={() => setWhereStep("country")}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 12,
-                            border: "1px solid #ddd",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 900,
-                            cursor: "pointer",
-                          }}
-                        >
-                          ← Back
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setWhereStep("city")}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 12,
-                            border: "1px solid #ddd",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 900,
-                            cursor: "pointer",
-                          }}
-                          title="Skip province and choose a city"
-                        >
-                          Next →
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
+    <button
+      type="button"
+      onClick={clearLocation}
+      disabled={!country && !province && !city && !neighbourhood}
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "black",
+        color: "#2bff00",
+        fontWeight: 950,
+        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+        whiteSpace: "nowrap",
+        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+      }}
+      title="Clear all location filters"
+    >
+      Clear
+    </button>
+  </div>
+) : null}
 
                   {whereStep === "city" ? (
                     <div style={{ display: "grid", gap: 8 }}>
@@ -1443,94 +1455,49 @@ const calendarMatches = useMemo(() => {
                           : null}
                       </select>
 
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          onClick={() => setWhereStep(province ? "province" : "country")}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 12,
-                            border: "1px solid #ddd",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 900,
-                            cursor: "pointer",
-                          }}
-                        >
-                          ← Back
-                        </button>
 
-                        <button
-                          type="button"
-                          onClick={() => setWhereStep("neighbourhood")}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 12,
-                            border: "1px solid #ddd",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 900,
-                            cursor: "pointer",
-                          }}
-                          title="Skip city and choose neighbourhood"
-                        >
-                          Next →
-                        </button>
-                      </div>
                     </div>
                   ) : null}
 
-                  {whereStep === "neighbourhood" ? (
-                    <div style={{ display: "grid", gap: 8 }}>
-                      <select
-                        value={neighbourhood}
-                        onChange={(e) => pickNeighbourhood(e.target.value)}
-                        className="sl-select"
-                      >
-                        <option value="">Any neighbourhood</option>
-                        {(NEIGHBOURHOODS_BY_CITY[city] ?? []).map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
+{whereStep === "neighbourhood" ? (
+  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+      <select
+        value={neighbourhood}
+        onChange={(e) => pickNeighbourhood(e.target.value)}
+        className="sl-select"
+        style={{ width: "100%" }}
+      >
+        <option value="">Any neighbourhood</option>
+        {(NEIGHBOURHOODS_BY_CITY[city] ?? []).map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+    </div>
 
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          onClick={() => setWhereStep("city")}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 12,
-                            border: "1px solid #ddd",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 900,
-                            cursor: "pointer",
-                          }}
-                        >
-                          ← Back
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setWhereStep("neighbourhood")}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 12,
-                            border: "1px solid #ddd",
-                            background: "black",
-                            color: "white",
-                            fontWeight: 900,
-                            cursor: "pointer",
-                          }}
-                          title="Done"
-                        >
-                          Done
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
+    <button
+      type="button"
+      onClick={clearLocation}
+      disabled={!country && !province && !city && !neighbourhood}
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "black",
+        color: "#2bff00",
+        fontWeight: 950,
+        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+        whiteSpace: "nowrap",
+        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+      }}
+      title="Clear all location filters"
+    >
+      Clear
+    </button>
+  </div>
+) : null}
                 </div>
 
                 {/* WHO */}
