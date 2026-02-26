@@ -547,19 +547,104 @@ const calendarMatches = useMemo(() => {
     setEventGenreOptions([]);
     setEventCityOptions([]);
 
-    const qRaw = q ?? "";
-    const qClean = normSpaces(qRaw).trim();
-    const qSlug = qClean.replace(/\s+/g, "-"); // "1st show" -> "1st-show"
+const qRaw = q ?? "";
+const qClean = normSpaces(qRaw).trim();
+const qSlug = qClean.replace(/\s+/g, "-"); // "1st show" -> "1st-show"
+const qLower = qClean.toLowerCase();
+const qSlugLower = qSlug.toLowerCase();
 
-    // 1) try normal
-    let { data, error } = await supabase.rpc("radio_pick_one_per_band_filtered", {
-      p_country: country || null,
-      p_province: province || null,
-      p_city: city || null,
-      p_neighbourhood: neighbourhood || null,
-      p_genre: genre || null,
-      p_q: qClean || null,
+// ✅ BAND MODE: if q exactly matches a band_slug, load ALL tracks for that band
+if (qSlugLower) {
+  // try exact matches in a sensible order
+  const candidates = Array.from(new Set([qSlugLower, qLower].filter(Boolean)));
+
+  let matchedSlug = "";
+
+  for (const cand of candidates) {
+    const { data: one, error: oneErr } = await supabase
+      .from("tracks")
+      .select("band_slug")
+      .eq("band_slug", cand)
+      .limit(1);
+
+    if (oneErr) {
+      setStatus(`Band check error: ${oneErr.message}`);
+      break;
+    }
+
+    if (one && one.length) {
+      matchedSlug = one[0].band_slug;
+      break;
+    }
+  }
+
+  if (matchedSlug) {
+    const { data: all, error: allErr } = await supabase
+      .from("tracks")
+      .select("id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,created_at")
+      .eq("band_slug", matchedSlug)
+      .order("created_at", { ascending: false });
+
+    if (allErr) {
+      setStatus(`Band tracks load error: ${allErr.message}`);
+      setTracks([]);
+      return;
+    }
+
+    const mappedAll: TrackView[] = (all ?? []).map((r: TrackRow) => ({
+      ...r,
+      url: getPublicUrl(r.file_path),
+      artUrl: getArtworkUrl(r.art_path),
+      flyerUrl: "",
+    }));
+
+    setTracks(mappedAll);
+
+    // keep genre dropdown stable
+    setMasterGenres((prev) => {
+      const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
+      for (const t of mappedAll) {
+        const g = norm(t.genre);
+        if (g) s.add(g);
+      }
+      return Array.from(s).sort((a, b) => a.localeCompare(b));
     });
+
+    setStatus(`Band mode: ${matchedSlug} • ${mappedAll.length} song(s)`);
+    return; // ✅ IMPORTANT: don't call the radio RPC
+  }
+}
+
+// ===== NORMAL RADIO MODE (fallback) =====
+
+// 1) try normal
+let { data, error } = await supabase.rpc("radio_pick_one_per_band_filtered", {
+  p_country: country || null,
+  p_province: province || null,
+  p_city: city || null,
+  p_neighbourhood: neighbourhood || null,
+  p_genre: genre || null,
+  p_q: qClean || null,
+});
+
+// 2) if empty AND we transformed spaces -> hyphens, retry with slug
+if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
+  const retry = await supabase.rpc("radio_pick_one_per_band_filtered", {
+    p_country: country || null,
+    p_province: province || null,
+    p_city: city || null,
+    p_neighbourhood: neighbourhood || null,
+    p_genre: genre || null,
+    p_q: qSlug || null,
+  });
+
+  if (!retry.error) {
+    data = retry.data;
+    error = retry.error;
+  } else {
+    error = retry.error;
+  }
+}
 
     // 2) if empty AND we transformed spaces -> hyphens, retry with slug
     if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
@@ -864,10 +949,10 @@ const calendarMatches = useMemo(() => {
     }
   }
 
-  const overlayTitle = useMemo(() => {
-    if (date) return "Event Radio";
-    return "Street Level - Radio Tuner";
-  }, [date]);
+const overlayTitle = useMemo(() => {
+  if (date) return "Event Radio";
+  return "StreetLevel.live";
+}, [date]);
 
   const mainMaxWidth = 1000;
 
@@ -1252,37 +1337,79 @@ const calendarMatches = useMemo(() => {
               overflow: "hidden",
             }}
           >
-            <div
-              style={{
-                padding: 14,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                borderBottom: "1px solid #eee",
-              }}
-            >
-              <div style={{ fontWeight: 950, color: "white", letterSpacing: 0.6 }}>{overlayTitle}</div>
+<div
+  style={{
+    padding: 14,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderBottom: "1px solid #eee",
+    position: "relative",
+  }}
+>
+  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img
+      src="/favicon.ico"
+      alt=""
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        display: "block",
+      }}
+    />
 
-              <div style={{ display: "flex", gap: 8 }}>
-                {hasStarted ? (
-                  <button
-                    onClick={closeFilters}
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: 12,
-                      border: "1px solid #ddd",
-                      background: "black",
-                      color: "white",
-                      fontWeight: 900,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ✕
-                  </button>
-                ) : null}
-              </div>
-            </div>
+<div
+  style={{
+    fontWeight: 950,
+    color: "white",
+    letterSpacing: 1,
+    textAlign: "center",
+    fontSize: 16,
+    padding: "6px 12px",
+    borderRadius: 999,
+    border: "1px solid rgba(43,255,0,0.35)",
+    background: "rgba(0,0,0,0.45)",
+
+    // glow
+    textShadow: "0 0 10px rgba(43,255,0,0.55), 0 0 22px rgba(43,255,0,0.28)",
+    boxShadow: "0 0 16px rgba(43,255,0,0.22)",
+  }}
+>
+  {overlayTitle}
+</div>
+
+
+
+
+  </div>
+
+
+
+
+  {hasStarted ? (
+    <button
+      onClick={closeFilters}
+      style={{
+        position: "absolute",
+        right: 14,
+        top: 14,
+        padding: "10px 12px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "black",
+        color: "white",
+        fontWeight: 900,
+        cursor: "pointer",
+      }}
+      title="Close"
+    >
+      ✕
+    </button>
+  ) : null}
+</div>
 
             <div
               style={{
