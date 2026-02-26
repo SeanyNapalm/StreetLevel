@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -40,10 +42,6 @@ type TrackRow = {
 };
 
 type TrackView = TrackRow & { url: string; artUrl: string; flyerUrl?: string };
-
-
-
-
 
 function getPublicUrl(path: string) {
   const res = supabase.storage.from("tracks").getPublicUrl(path);
@@ -89,7 +87,20 @@ function toTitleCaseSmart(input: string) {
   const s = normSpaces(input).toLowerCase();
   if (!s) return "";
 
-  const minor = new Set(["and", "or", "the", "a", "an", "of", "to", "in", "on", "at", "for", "with"]);
+  const minor = new Set([
+    "and",
+    "or",
+    "the",
+    "a",
+    "an",
+    "of",
+    "to",
+    "in",
+    "on",
+    "at",
+    "for",
+    "with",
+  ]);
 
   return s
     .split(" ")
@@ -269,7 +280,6 @@ export default function HomePage() {
       setFiltersOpen(false);
       setHasStarted(true);
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -299,54 +309,51 @@ export default function HomePage() {
     };
   }, []);
 
-const LOCATION_SELECT_MAX = 430;
+  // ✅ Filter panel sizing (single source of truth)
+  const FILTER_PANEL_MAX = 560; // overall modal width cap (shrink this to taste)
+  const FILTER_FIELD_MAX = 430; // max width for “main” inputs/selects inside
+  const FILTER_GO_MAX = FILTER_FIELD_MAX; // make GO button match field width
 
-// ✅ Filter panel sizing (single source of truth)
-const FILTER_PANEL_MAX = 560;        // overall modal width cap (shrink this to taste)
-const FILTER_FIELD_MAX = 430;        // max width for “main” inputs/selects inside
-const FILTER_GO_MAX = FILTER_FIELD_MAX; // make GO button match field width
-
-function clearLocation() {
-  setCountry("");
-  setProvince("");
-  setCity("");
-  setNeighbourhood("");
-  setWhereStep("country");
-}
-
-
-function pickEventAndPlay(ev: EventRow) {
-  const showName = normSpaces(ev.note ?? "").toUpperCase();
-  if (showName) {
-    setEventShowName(showName);
-    setDate(""); // use show-name mode
-  } else {
-    // fallback to date mode if note is missing
-    setEventShowName("");
-    setDate((ev.show_date ?? "").slice(0, 10));
+  function clearLocation() {
+    setCountry("");
+    setProvince("");
+    setCity("");
+    setNeighbourhood("");
+    setWhereStep("country");
   }
 
-  // ✅ Apply event’s stored location/genre (if present)
-  if (ev.country) setCountry(toTitleCaseSmart(ev.country));
-  if (ev.province) setProvince(toTitleCaseSmart(ev.province));
-  if (ev.city) setCity(toTitleCaseSmart(ev.city));
-  if (ev.genre) setGenre(toTitleCaseSmart(ev.genre));
+  function pickEventAndPlay(ev: EventRow) {
+    const showName = normSpaces(ev.note ?? "").toUpperCase();
+    if (showName) {
+      setEventShowName(showName);
+      setDate(""); // use show-name mode
+    } else {
+      // fallback to date mode if note is missing
+      setEventShowName("");
+      setDate((ev.show_date ?? "").slice(0, 10));
+    }
 
-  // ✅ Optional: clear band/song search so event mode feels clean
-  setQ("");
+    // ✅ Apply event’s stored location/genre (if present)
+    if (ev.country) setCountry(toTitleCaseSmart(ev.country));
+    if (ev.province) setProvince(toTitleCaseSmart(ev.province));
+    if (ev.city) setCity(toTitleCaseSmart(ev.city));
+    if (ev.genre) setGenre(toTitleCaseSmart(ev.genre));
 
-  // ✅ Ensure the progressive WHERE UI is at the deepest available level
-  if (ev.city) setWhereStep("neighbourhood");
-  else if (ev.province) setWhereStep("city");
-  else if (ev.country) setWhereStep("province");
-  else setWhereStep("country");
+    // ✅ Optional: clear band/song search so event mode feels clean
+    setQ("");
 
-  setHasStarted(true);
-  setFiltersOpen(false);
-  setCalendarOpen(false);
+    // ✅ Ensure the progressive WHERE UI is at the deepest available level
+    if (ev.city) setWhereStep("neighbourhood");
+    else if (ev.province) setWhereStep("city");
+    else if (ev.country) setWhereStep("province");
+    else setWhereStep("country");
 
-  autoStartAfterEventPickRef.current = true;
-}
+    setHasStarted(true);
+    setFiltersOpen(false);
+    setCalendarOpen(false);
+
+    autoStartAfterEventPickRef.current = true;
+  }
 
   // keep URL in sync (nice for sharing)
   function syncUrl() {
@@ -375,109 +382,107 @@ function pickEventAndPlay(ev: EventRow) {
   }
 
   // ✅ Load calendar events once (upcoming filtering happens client-side)
-async function loadCalendarEvents() {
-  setCalendarLoading(true);
-  setCalendarError("");
+  async function loadCalendarEvents() {
+    setCalendarLoading(true);
+    setCalendarError("");
 
-  const today = localTodayISO();
+    const today = localTodayISO();
 
-  const { data, error } = await supabase
-    .from("events")
-    .select("id, country, province, city, genre, show_date, note, flyer_path, track_id, created_at")
-    .gte("show_date", today) // ✅ future-only at the DB level
-    .order("show_date", { ascending: true })
-    .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("events")
+      .select("id, country, province, city, genre, show_date, note, flyer_path, track_id, created_at")
+      .gte("show_date", today) // ✅ future-only at the DB level
+      .order("show_date", { ascending: true })
+      .order("created_at", { ascending: false });
 
-  setCalendarLoading(false);
+    setCalendarLoading(false);
 
-  if (error) {
-    setCalendarError(error.message);
-    setCalendarEvents([]);
-    return;
+    if (error) {
+      setCalendarError(error.message);
+      setCalendarEvents([]);
+      return;
+    }
+
+    setCalendarEvents((data ?? []) as EventRow[]);
   }
-
-  setCalendarEvents((data ?? []) as EventRow[]);
-}
 
   // ✅ Only show upcoming events + only those matching current filters
-const calendarMatches = useMemo(() => {
-  const today = localTodayISO();
+  const calendarMatches = useMemo(() => {
+    const today = localTodayISO();
 
-  const co = country.trim().toLowerCase();
-  const pr = province.trim().toLowerCase();
-  const cc = city.trim().toLowerCase();
-  const gg = genre.trim().toLowerCase();
+    const co = country.trim().toLowerCase();
+    const pr = province.trim().toLowerCase();
+    const cc = city.trim().toLowerCase();
+    const gg = genre.trim().toLowerCase();
 
-  const filteredUpcoming = calendarEvents.filter((ev) => {
-    const d = (ev.show_date ?? "").slice(0, 10);
-    if (!d) return false;
+    const filteredUpcoming = calendarEvents.filter((ev) => {
+      const d = (ev.show_date ?? "").slice(0, 10);
+      if (!d) return false;
 
-    // ✅ upcoming only (today or future)
-    if (d < today) return false;
+      // ✅ upcoming only (today or future)
+      if (d < today) return false;
 
-    const evCountry = (ev.country ?? "").toLowerCase();
-    const evProvince = (ev.province ?? "").toLowerCase();
-    const evCity = (ev.city ?? "").toLowerCase();
-    const evGenre = (ev.genre ?? "").toLowerCase();
+      const evCountry = (ev.country ?? "").toLowerCase();
+      const evProvince = (ev.province ?? "").toLowerCase();
+      const evCity = (ev.city ?? "").toLowerCase();
+      const evGenre = (ev.genre ?? "").toLowerCase();
 
-    // ✅ If user picked a filter, event must match it.
-    // Use includes() so “Ottawa” matches “Ottawa (Downtown)” etc.
-    const matchCountry = !co || evCountry.includes(co);
-    const matchProvince = !pr || evProvince.includes(pr);
-    const matchCity = !cc || evCity.includes(cc);
-    const matchGenre = !gg || evGenre.includes(gg);
+      // ✅ If user picked a filter, event must match it.
+      // Use includes() so “Ottawa” matches “Ottawa (Downtown)” etc.
+      const matchCountry = !co || evCountry.includes(co);
+      const matchProvince = !pr || evProvince.includes(pr);
+      const matchCity = !cc || evCity.includes(cc);
+      const matchGenre = !gg || evGenre.includes(gg);
 
-    return matchCountry && matchProvince && matchCity && matchGenre;
-  });
+      return matchCountry && matchProvince && matchCity && matchGenre;
+    });
 
-  // ✅ De-dupe: if multiple rows share same DATE + EVENT NAME, show it once
-  // Keep the first one (your query orders created_at desc, so this keeps the newest row)
-  const seen = new Set<string>();
-  const unique: EventRow[] = [];
+    // ✅ De-dupe: if multiple rows share same DATE + EVENT NAME, show it once
+    // Keep the first one (your query orders created_at desc, so this keeps the newest row)
+    const seen = new Set<string>();
+    const unique: EventRow[] = [];
 
-  for (const ev of filteredUpcoming) {
-    const d = (ev.show_date ?? "").slice(0, 10);
-    const nameKey = normSpaces(ev.note ?? "").toUpperCase();
+    for (const ev of filteredUpcoming) {
+      const d = (ev.show_date ?? "").slice(0, 10);
+      const nameKey = normSpaces(ev.note ?? "").toUpperCase();
 
-    // if there is no name, fall back to id so unnamed events don’t collapse together
-    const key = nameKey ? `${d}::${nameKey}` : `ID::${ev.id}`;
+      // if there is no name, fall back to id so unnamed events don’t collapse together
+      const key = nameKey ? `${d}::${nameKey}` : `ID::${ev.id}`;
 
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(ev);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(ev);
 
-    if (unique.length >= 200) break;
+      if (unique.length >= 200) break;
+    }
+
+    return unique;
+  }, [calendarEvents, country, province, city, genre]);
+
+  async function creditAdShareOnce(perPageTracks: TrackView[]) {
+    if (offlineMode) return;
+
+    const slugs = Array.from(
+      new Set((perPageTracks ?? []).map((t) => (t.band_slug ?? "").trim()).filter(Boolean))
+    );
+
+    if (!slugs.length) return;
+
+    const { error } = await supabase.rpc("increment_ad_share_for_band_slugs", {
+      p_band_slugs: slugs,
+    });
+
+    if (error) {
+      // Don’t break the radio if counting fails
+      console.warn("ad_share increment failed:", error.message);
+    }
   }
-
-  return unique;
-}, [calendarEvents, country, province, city, genre]);
-
-
-async function creditAdShareOnce(perPageTracks: TrackView[]) {
-  if (offlineMode) return;
-
-  const slugs = Array.from(
-    new Set((perPageTracks ?? []).map((t) => (t.band_slug ?? "").trim()).filter(Boolean))
-  );
-
-  if (!slugs.length) return;
-
-  const { error } = await supabase.rpc("increment_ad_share_for_band_slugs", {
-    p_band_slugs: slugs,
-  });
-
-  if (error) {
-    // Don’t break the radio if counting fails
-    console.warn("ad_share increment failed:", error.message);
-  }
-}
-
 
   // ============== DATA LOAD ==============
-  async function loadTracks() {
+  async function loadTracks(): Promise<TrackView[]> {
     if (offlineMode) {
       setStatus("Offline mode: not refreshing from server.");
-      return;
+      return [];
     }
 
     setStatus("Loading...");
@@ -490,7 +495,8 @@ async function creditAdShareOnce(perPageTracks: TrackView[]) {
 
       let evQ = supabase
         .from("events")
-        .select("id, city, genre, show_date, note, flyer_path, track_id, created_at")
+        // include new fields too (safe even if you don't use them here yet)
+        .select("id, country, province, city, genre, show_date, note, flyer_path, track_id, created_at")
         .order("created_at", { ascending: false });
 
       if (cleanEventName) {
@@ -504,11 +510,12 @@ async function creditAdShareOnce(perPageTracks: TrackView[]) {
         setTracks([]);
         setEventGenreOptions([]);
         setEventCityOptions([]);
-        return;
+        return [];
       }
 
       const eventRows = (evs ?? []) as any[];
 
+      // build dropdown options (event-mode)
       {
         const gset = new Set<string>();
         const cset = new Set<string>();
@@ -525,7 +532,7 @@ async function creditAdShareOnce(perPageTracks: TrackView[]) {
       if (!cleanEventName && date && (!city.trim() || !genre.trim())) {
         setTracks([]);
         setStatus("Pick a date + city + genre to see event radio songs.");
-        return;
+        return [];
       }
 
       const filteredEvents = eventRows.filter((e) => {
@@ -547,7 +554,7 @@ async function creditAdShareOnce(perPageTracks: TrackView[]) {
         } else {
           setStatus(`No events found for ${date} with ${city} + ${genre}.`);
         }
-        return;
+        return [];
       }
 
       const { data: ts, error: tErr } = await supabase
@@ -558,7 +565,7 @@ async function creditAdShareOnce(perPageTracks: TrackView[]) {
       if (tErr) {
         setStatus(`Tracks load error: ${tErr.message}`);
         setTracks([]);
-        return;
+        return [];
       }
 
       const flyerByTrackId = new Map<string, string | null>();
@@ -578,123 +585,106 @@ async function creditAdShareOnce(perPageTracks: TrackView[]) {
       });
 
       setTracks(mapped);
-   
 
-      if (cleanEventName) {
-        setStatus(`Event search: ${cleanEventName}`);
-      } else {
-        setStatus(`Event radio for ${date}`);
-      }
-      return;
+      // keep genre dropdown stable (event tracks contain genres too)
+      setMasterGenres((prev) => {
+        const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
+        for (const t of mapped) {
+          const g = norm(t.genre);
+          if (g) s.add(g);
+        }
+        return Array.from(s).sort((a, b) => a.localeCompare(b));
+      });
+
+      if (cleanEventName) setStatus(`Event search: ${cleanEventName}`);
+      else setStatus(`Event radio for ${date}`);
+
+      return mapped;
     }
 
-    // ===== NORMAL RADIO MODE (no date chosen) =====
+    // ===== NORMAL RADIO MODE (no date & no clean event name) =====
     setEventMode(false);
     setEventGenreOptions([]);
     setEventCityOptions([]);
 
-const qRaw = q ?? "";
-const qClean = normSpaces(qRaw).trim();
-const qSlug = qClean.replace(/\s+/g, "-"); // "1st show" -> "1st-show"
-const qLower = qClean.toLowerCase();
-const qSlugLower = qSlug.toLowerCase();
+    const qRaw = q ?? "";
+    const qClean = normSpaces(qRaw).trim();
+    const qSlug = qClean.replace(/\s+/g, "-"); // "1st show" -> "1st-show"
+    const qLower = qClean.toLowerCase();
+    const qSlugLower = qSlug.toLowerCase();
 
-// ✅ BAND MODE: if q exactly matches a band_slug, load ALL tracks for that band
-if (qSlugLower) {
-  // try exact matches in a sensible order
-  const candidates = Array.from(new Set([qSlugLower, qLower].filter(Boolean)));
+    // ✅ BAND MODE: if q exactly matches a band_slug, load ALL tracks for that band
+    if (qSlugLower) {
+      const candidates = Array.from(new Set([qSlugLower, qLower].filter(Boolean)));
 
-  let matchedSlug = "";
+      let matchedSlug = "";
 
-  for (const cand of candidates) {
-    const { data: one, error: oneErr } = await supabase
-      .from("tracks")
-      .select("band_slug")
-      .eq("band_slug", cand)
-      .limit(1);
+      for (const cand of candidates) {
+        const { data: one, error: oneErr } = await supabase
+          .from("tracks")
+          .select("band_slug")
+          .eq("band_slug", cand)
+          .limit(1);
 
-    if (oneErr) {
-      setStatus(`Band check error: ${oneErr.message}`);
-      break;
-    }
+        if (oneErr) {
+          setStatus(`Band check error: ${oneErr.message}`);
+          break;
+        }
 
-    if (one && one.length) {
-      matchedSlug = one[0].band_slug;
-      break;
-    }
-  }
-
-  if (matchedSlug) {
-    const { data: all, error: allErr } = await supabase
-      .from("tracks")
-      .select("id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,created_at")
-      .eq("band_slug", matchedSlug)
-      .order("created_at", { ascending: false });
-
-    if (allErr) {
-      setStatus(`Band tracks load error: ${allErr.message}`);
-      setTracks([]);
-      return;
-    }
-
-    const mappedAll: TrackView[] = (all ?? []).map((r: TrackRow) => ({
-      ...r,
-      url: getPublicUrl(r.file_path),
-      artUrl: getArtworkUrl(r.art_path),
-      flyerUrl: "",
-    }));
-
-    setTracks(mappedAll);
-  
-
-
-    // keep genre dropdown stable
-    setMasterGenres((prev) => {
-      const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
-      for (const t of mappedAll) {
-        const g = norm(t.genre);
-        if (g) s.add(g);
+        if (one && one.length) {
+          matchedSlug = one[0].band_slug;
+          break;
+        }
       }
-      return Array.from(s).sort((a, b) => a.localeCompare(b));
+
+      if (matchedSlug) {
+        const { data: all, error: allErr } = await supabase
+          .from("tracks")
+          .select("id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,created_at")
+          .eq("band_slug", matchedSlug)
+          .order("created_at", { ascending: false });
+
+        if (allErr) {
+          setStatus(`Band tracks load error: ${allErr.message}`);
+          setTracks([]);
+          return [];
+        }
+
+        const mappedAll: TrackView[] = (all ?? []).map((r: TrackRow) => ({
+          ...r,
+          url: getPublicUrl(r.file_path),
+          artUrl: getArtworkUrl(r.art_path),
+          flyerUrl: "",
+        }));
+
+        setTracks(mappedAll);
+
+        // keep genre dropdown stable
+        setMasterGenres((prev) => {
+          const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
+          for (const t of mappedAll) {
+            const g = norm(t.genre);
+            if (g) s.add(g);
+          }
+          return Array.from(s).sort((a, b) => a.localeCompare(b));
+        });
+
+        setStatus(`Band mode: ${matchedSlug} • ${mappedAll.length} song(s)`);
+        return mappedAll; // ✅ IMPORTANT: don't call the radio RPC
+      }
+    }
+
+    // ===== NORMAL RADIO MODE (fallback: RPC) =====
+    let { data, error } = await supabase.rpc("radio_pick_one_per_band_filtered", {
+      p_country: country || null,
+      p_province: province || null,
+      p_city: city || null,
+      p_neighbourhood: neighbourhood || null,
+      p_genre: genre || null,
+      p_q: qClean || null,
     });
 
-    setStatus(`Band mode: ${matchedSlug} • ${mappedAll.length} song(s)`);
-    return; // ✅ IMPORTANT: don't call the radio RPC
-  }
-}
-
-// ===== NORMAL RADIO MODE (fallback) =====
-
-// 1) try normal
-let { data, error } = await supabase.rpc("radio_pick_one_per_band_filtered", {
-  p_country: country || null,
-  p_province: province || null,
-  p_city: city || null,
-  p_neighbourhood: neighbourhood || null,
-  p_genre: genre || null,
-  p_q: qClean || null,
-});
-
-// 2) if empty AND we transformed spaces -> hyphens, retry with slug
-if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
-  const retry = await supabase.rpc("radio_pick_one_per_band_filtered", {
-    p_country: country || null,
-    p_province: province || null,
-    p_city: city || null,
-    p_neighbourhood: neighbourhood || null,
-    p_genre: genre || null,
-    p_q: qSlug || null,
-  });
-
-  if (!retry.error) {
-    data = retry.data;
-    error = retry.error;
-  } else {
-    error = retry.error;
-  }
-}
-
-    // 2) if empty AND we transformed spaces -> hyphens, retry with slug
+    // retry with slug if empty
     if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
       const retry = await supabase.rpc("radio_pick_one_per_band_filtered", {
         p_country: country || null,
@@ -715,7 +705,7 @@ if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
 
     if (error) {
       setStatus(`Load error: ${error.message}`);
-      return;
+      return [];
     }
 
     const mapped: TrackView[] = (data ?? []).map((r: TrackRow) => ({
@@ -726,7 +716,6 @@ if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
     }));
 
     setTracks(mapped);
-   
 
     setMasterGenres((prev) => {
       const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
@@ -738,6 +727,7 @@ if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
     });
 
     setStatus(mapped.length ? "" : "No radio tracks yet.");
+    return mapped;
   }
 
   // ✅ Auto-load when filters change
@@ -983,34 +973,30 @@ if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
     setFiltersOpen(false);
   }
 
-async function radioLetsGo() {
-  setHasStarted(true);
-  closeFilters();
+  async function radioLetsGo() {
+    setHasStarted(true);
+    closeFilters();
 
-  if (!offlineMode) {
-    await loadTracks();
+    if (!offlineMode) {
+      await loadTracks();
 
-    // ✅ Count ONE hit per band for the tracks that were loaded by GO
-    // Use the current `tracks` state from before the load? Nope — state updates are async.
-    // So we credit based on what loadTracks() just loaded by reading from the DOM? also nope.
-    // Easiest: credit using the "filtered" list after load has had a tick to update.
-    setTimeout(() => {
-      // credit based on whatever is currently loaded and visible for this GO action
-      creditAdShareOnce(filtered);
-    }, 0);
+      // ✅ Count ONE hit per band for the tracks that were loaded by GO
+      setTimeout(() => {
+        creditAdShareOnce(filtered);
+      }, 0);
+    }
+
+    if (!nowPlaying) {
+      setTimeout(() => {
+        go();
+      }, 30);
+    }
   }
 
-  if (!nowPlaying) {
-    setTimeout(() => {
-      go();
-    }, 30);
-  }
-}
-
-const overlayTitle = useMemo(() => {
-  if (date) return "Event Radio";
-  return "StreetLevel.live";
-}, [date]);
+  const overlayTitle = useMemo(() => {
+    if (date) return "Event Radio";
+    return "StreetLevel.live";
+  }, [date]);
 
   const mainMaxWidth = 1000;
 
@@ -1395,99 +1381,92 @@ const overlayTitle = useMemo(() => {
               overflow: "hidden",
             }}
           >
-<div
-  style={{
-    padding: 14,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    borderBottom: "1px solid #eee",
-    position: "relative",
-  }}
->
-  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-    {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img
-      src="/favicon.ico"
-      alt=""
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: 6,
-        display: "block",
-      }}
-    />
+            <div
+              style={{
+                padding: 14,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                borderBottom: "1px solid #eee",
+                position: "relative",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/favicon.ico"
+                  alt=""
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    display: "block",
+                  }}
+                />
 
-<div
-  style={{
-    fontWeight: 950,
-    color: "white",
-    letterSpacing: 1,
-    textAlign: "center",
-    fontSize: 16,
-    padding: "6px 12px",
-    borderRadius: 999,
-    border: "1px solid rgba(43,255,0,0.35)",
-    background: "rgba(0,0,0,0.45)",
+                <div
+                  style={{
+                    fontWeight: 950,
+                    color: "white",
+                    letterSpacing: 1,
+                    textAlign: "center",
+                    fontSize: 16,
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(43,255,0,0.35)",
+                    background: "rgba(0,0,0,0.45)",
 
-    // glow
-    textShadow: "0 0 10px rgba(43,255,0,0.55), 0 0 22px rgba(43,255,0,0.28)",
-    boxShadow: "0 0 16px rgba(43,255,0,0.22)",
-  }}
->
-  {overlayTitle}
-</div>
+                    // glow
+                    textShadow: "0 0 10px rgba(43,255,0,0.55), 0 0 22px rgba(43,255,0,0.28)",
+                    boxShadow: "0 0 16px rgba(43,255,0,0.22)",
+                  }}
+                >
+                  {overlayTitle}
+                </div>
+              </div>
 
+              {hasStarted ? (
+                <button
+                  onClick={closeFilters}
+                  style={{
+                    position: "absolute",
+                    right: 14,
+                    top: 14,
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid #ddd",
+                    background: "black",
+                    color: "white",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                  title="Close"
+                >
+                  ✕
+                </button>
+              ) : null}
+            </div>
 
-
-
-  </div>
-
-
-
-
-  {hasStarted ? (
-    <button
-      onClick={closeFilters}
-      style={{
-        position: "absolute",
-        right: 14,
-        top: 14,
-        padding: "10px 12px",
-        borderRadius: 12,
-        border: "1px solid #ddd",
-        background: "black",
-        color: "white",
-        fontWeight: 900,
-        cursor: "pointer",
-      }}
-      title="Close"
-    >
-      ✕
-    </button>
-  ) : null}
-</div>
-
-<div
-  style={{
-    padding: 14,
-    display: "grid",
-    gap: 12,
-    overflowY: "auto",
-    WebkitOverflowScrolling: "touch",
-  }}
->
-  {/* ✅ Centered narrow column for ALL controls */}
-  <div
-    style={{
-      width: "100%",
-      maxWidth: `${FILTER_FIELD_MAX}px`,
-      margin: "0 auto",
-      display: "grid",
-      gap: 10,
-    }}
-  >
+            <div
+              style={{
+                padding: 14,
+                display: "grid",
+                gap: 12,
+                overflowY: "auto",
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
+              {/* ✅ Centered narrow column for ALL controls */}
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: `${FILTER_FIELD_MAX}px`,
+                  margin: "0 auto",
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
                 {/* WHAT */}
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>What Genre?:)</div>
@@ -1504,221 +1483,221 @@ const overlayTitle = useMemo(() => {
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>From Where?:</div>
 
-{prettyBreadcrumb.length ? (
-  <div
-    style={{
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 8,
-      alignItems: "center",
-      fontSize: 12,
-      opacity: 0.9,
-    }}
-  >
-    {prettyBreadcrumb.map((p, idx) => {
-      const isLast = idx === prettyBreadcrumb.length - 1;
-      return (
-        <button
-          key={`${p}-${idx}`}
-          type="button"
-          onClick={() => {
-            if (idx === 0) resetBelow("country");
-            if (idx === 1) resetBelow("province");
-            if (idx === 2) resetBelow("city");
-            if (idx === 3) resetBelow("neighbourhood");
-          }}
-          style={{
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: "1px solid #ddd",
-            background: isLast ? "black" : "white",
-            color: isLast ? "white" : "black",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-          title="Tap to go back / change this level"
-        >
-          {p}
-        </button>
-      );
-    })}
-  </div>
-) : (
-  <div style={{ fontSize: 12, color: "white", opacity: 0.65 }}>
-    Optional. Pick country/province/city/neighbourhood… or leave blank.
-  </div>
-)}
+                  {prettyBreadcrumb.length ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        alignItems: "center",
+                        fontSize: 12,
+                        opacity: 0.9,
+                      }}
+                    >
+                      {prettyBreadcrumb.map((p, idx) => {
+                        const isLast = idx === prettyBreadcrumb.length - 1;
+                        return (
+                          <button
+                            key={`${p}-${idx}`}
+                            type="button"
+                            onClick={() => {
+                              if (idx === 0) resetBelow("country");
+                              if (idx === 1) resetBelow("province");
+                              if (idx === 2) resetBelow("city");
+                              if (idx === 3) resetBelow("neighbourhood");
+                            }}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: 999,
+                              border: "1px solid #ddd",
+                              background: isLast ? "black" : "white",
+                              color: isLast ? "white" : "black",
+                              fontWeight: 900,
+                              cursor: "pointer",
+                            }}
+                            title="Tap to go back / change this level"
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "white", opacity: 0.65 }}>
+                      Optional. Pick country/province/city/neighbourhood… or leave blank.
+                    </div>
+                  )}
 
-{whereStep === "country" ? (
-  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
-      <select
-        value={country}
-        onChange={(e) => pickCountry(e.target.value)}
-        className="sl-select"
-        style={{ width: "100%" }}
-      >
-        <option value="">Any country</option>
-        {COUNTRY_OPTIONS.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
-    </div>
+                  {whereStep === "country" ? (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
+                        <select
+                          value={country}
+                          onChange={(e) => pickCountry(e.target.value)}
+                          className="sl-select"
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">Any country</option>
+                          {COUNTRY_OPTIONS.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-    <button
-      type="button"
-      onClick={clearLocation}
-      disabled={!country && !province && !city && !neighbourhood}
-      style={{
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: "1px solid #ddd",
-        background: "black",
-        color: "#2bff00",
-        fontWeight: 950,
-        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
-        whiteSpace: "nowrap",
-        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
-      }}
-      title="Clear all location filters"
-    >
-      Clear
-    </button>
-  </div>
-) : null}
+                      <button
+                        type="button"
+                        onClick={clearLocation}
+                        disabled={!country && !province && !city && !neighbourhood}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 12,
+                          border: "1px solid #ddd",
+                          background: "black",
+                          color: "#2bff00",
+                          fontWeight: 950,
+                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+                          whiteSpace: "nowrap",
+                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+                        }}
+                        title="Clear all location filters"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : null}
 
-{whereStep === "province" ? (
-  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
-      <select
-        value={province}
-        onChange={(e) => pickProvince(e.target.value)}
-        className="sl-select"
-        style={{ width: "100%" }}
-      >
-        <option value="">Any province</option>
-        {(PROVINCES_BY_COUNTRY[country || "Canada"] ?? PROVINCES_BY_COUNTRY["Canada"]).map((p) => (
-          <option key={p} value={p}>
-            {p}
-          </option>
-        ))}
-      </select>
-    </div>
+                  {whereStep === "province" ? (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
+                        <select
+                          value={province}
+                          onChange={(e) => pickProvince(e.target.value)}
+                          className="sl-select"
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">Any province</option>
+                          {(PROVINCES_BY_COUNTRY[country || "Canada"] ?? PROVINCES_BY_COUNTRY["Canada"]).map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-    <button
-      type="button"
-      onClick={clearLocation}
-      disabled={!country && !province && !city && !neighbourhood}
-      style={{
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: "1px solid #ddd",
-        background: "black",
-        color: "#2bff00",
-        fontWeight: 950,
-        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
-        whiteSpace: "nowrap",
-        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
-      }}
-      title="Clear all location filters"
-    >
-      Clear
-    </button>
-  </div>
-) : null}
+                      <button
+                        type="button"
+                        onClick={clearLocation}
+                        disabled={!country && !province && !city && !neighbourhood}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 12,
+                          border: "1px solid #ddd",
+                          background: "black",
+                          color: "#2bff00",
+                          fontWeight: 950,
+                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+                          whiteSpace: "nowrap",
+                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+                        }}
+                        title="Clear all location filters"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : null}
 
-{whereStep === "city" ? (
-  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
-      <select
-        value={city}
-        onChange={(e) => pickCity(e.target.value)}
-        className="sl-select"
-        style={{ width: "100%" }}
-      >
-        <option value="">Any city</option>
+                  {whereStep === "city" ? (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
+                        <select
+                          value={city}
+                          onChange={(e) => pickCity(e.target.value)}
+                          className="sl-select"
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">Any city</option>
 
-        {(CITIES_BY_PROVINCE[province] ?? []).map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
+                          {(CITIES_BY_PROVINCE[province] ?? []).map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
 
-        {date
-          ? cityOptions
-              .filter((x) => x)
-              .map((c) => (
-                <option key={`ev-${c}`} value={c}>
-                  {c}
-                </option>
-              ))
-          : null}
-      </select>
-    </div>
+                          {date
+                            ? cityOptions
+                                .filter((x) => x)
+                                .map((c) => (
+                                  <option key={`ev-${c}`} value={c}>
+                                    {c}
+                                  </option>
+                                ))
+                            : null}
+                        </select>
+                      </div>
 
-    <button
-      type="button"
-      onClick={clearLocation}
-      disabled={!country && !province && !city && !neighbourhood}
-      style={{
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: "1px solid #ddd",
-        background: "black",
-        color: "#2bff00",
-        fontWeight: 950,
-        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
-        whiteSpace: "nowrap",
-        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
-      }}
-      title="Clear all location filters"
-    >
-      Clear
-    </button>
-  </div>
-) : null}
+                      <button
+                        type="button"
+                        onClick={clearLocation}
+                        disabled={!country && !province && !city && !neighbourhood}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 12,
+                          border: "1px solid #ddd",
+                          background: "black",
+                          color: "#2bff00",
+                          fontWeight: 950,
+                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+                          whiteSpace: "nowrap",
+                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+                        }}
+                        title="Clear all location filters"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : null}
 
-{whereStep === "neighbourhood" ? (
-  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
-      <select
-        value={neighbourhood}
-        onChange={(e) => pickNeighbourhood(e.target.value)}
-        className="sl-select"
-        style={{ width: "100%" }}
-      >
-        <option value="">Any neighbourhood</option>
-        {(NEIGHBOURHOODS_BY_CITY[city] ?? []).map((n) => (
-          <option key={n} value={n}>
-            {n}
-          </option>
-        ))}
-      </select>
-    </div>
+                  {whereStep === "neighbourhood" ? (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
+                        <select
+                          value={neighbourhood}
+                          onChange={(e) => pickNeighbourhood(e.target.value)}
+                          className="sl-select"
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">Any neighbourhood</option>
+                          {(NEIGHBOURHOODS_BY_CITY[city] ?? []).map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-    <button
-      type="button"
-      onClick={clearLocation}
-      disabled={!country && !province && !city && !neighbourhood}
-      style={{
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: "1px solid #ddd",
-        background: "black",
-        color: "#2bff00",
-        fontWeight: 950,
-        cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
-        whiteSpace: "nowrap",
-        opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
-      }}
-      title="Clear all location filters"
-    >
-      Clear
-    </button>
-  </div>
-) : null}
+                      <button
+                        type="button"
+                        onClick={clearLocation}
+                        disabled={!country && !province && !city && !neighbourhood}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 12,
+                          border: "1px solid #ddd",
+                          background: "black",
+                          color: "#2bff00",
+                          fontWeight: 950,
+                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+                          whiteSpace: "nowrap",
+                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+                        }}
+                        title="Clear all location filters"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* WHO */}
@@ -1778,13 +1757,13 @@ const overlayTitle = useMemo(() => {
                       Band / song search:
                     </div>
 
-<input
-  value={q}
-  onChange={(e) => setQ(e.target.value)}
-  placeholder="Band name (or song title)"
-  className="sl-input"
-  style={{ width: "100%", maxWidth: `${FILTER_FIELD_MAX}px` }}
-/>
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Band name (or song title)"
+                      className="sl-input"
+                      style={{ width: "100%", maxWidth: `${FILTER_FIELD_MAX}px` }}
+                    />
                   </div>
                 </div>
 
@@ -1810,22 +1789,22 @@ const overlayTitle = useMemo(() => {
                     marginTop: 6,
                   }}
                 >
-<button
-  onClick={radioLetsGo}
-  style={{
-    width: "100%",
-    maxWidth: `${FILTER_GO_MAX}px`,
-    margin: "0 auto",
-    display: "block",
-    padding: "14px 14px",
-    borderRadius: 14,
-    border: "1px solid #ddd",
-    fontWeight: 950,
-    background: "black",
-    color: "#2bff00",
-    cursor: "pointer",
-    letterSpacing: 0.6,
-  }}
+                  <button
+                    onClick={radioLetsGo}
+                    style={{
+                      width: "100%",
+                      maxWidth: `${FILTER_GO_MAX}px`,
+                      margin: "0 auto",
+                      display: "block",
+                      padding: "14px 14px",
+                      borderRadius: 14,
+                      border: "1px solid #ddd",
+                      fontWeight: 950,
+                      background: "black",
+                      color: "#2bff00",
+                      cursor: "pointer",
+                      letterSpacing: 0.6,
+                    }}
                     title="Start the radio with whatever you picked (or nothing!)"
                   >
                     RADIO LETS GO!
@@ -1877,9 +1856,7 @@ const overlayTitle = useMemo(() => {
                 borderBottom: "1px solid rgba(255,255,255,0.15)",
               }}
             >
-              <div style={{ fontWeight: 950, letterSpacing: 0.6 }}>
-                Calendar • Upcoming events matching your filters
-              </div>
+              <div style={{ fontWeight: 950, letterSpacing: 0.6 }}>Calendar • Upcoming events matching your filters</div>
 
               <button
                 onClick={() => setCalendarOpen(false)}
@@ -1922,7 +1899,7 @@ const overlayTitle = useMemo(() => {
               {calendarMatches.map((ev) => {
                 const d = (ev.show_date ?? "").slice(0, 10);
                 const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
-  const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
+                const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
 
                 return (
                   <button
