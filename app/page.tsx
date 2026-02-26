@@ -408,30 +408,50 @@ const calendarMatches = useMemo(() => {
   const cc = city.trim().toLowerCase();
   const gg = genre.trim().toLowerCase();
 
-  return calendarEvents
-    .filter((ev) => {
-      const d = (ev.show_date ?? "").slice(0, 10);
-      if (!d) return false;
+  const filteredUpcoming = calendarEvents.filter((ev) => {
+    const d = (ev.show_date ?? "").slice(0, 10);
+    if (!d) return false;
 
-      // ✅ upcoming only (today or future)
-      if (d < today) return false;
+    // ✅ upcoming only (today or future)
+    if (d < today) return false;
 
-      const evCountry = (ev.country ?? "").toLowerCase();
-      const evProvince = (ev.province ?? "").toLowerCase();
-      const evCity = (ev.city ?? "").toLowerCase();
-      const evGenre = (ev.genre ?? "").toLowerCase();
+    const evCountry = (ev.country ?? "").toLowerCase();
+    const evProvince = (ev.province ?? "").toLowerCase();
+    const evCity = (ev.city ?? "").toLowerCase();
+    const evGenre = (ev.genre ?? "").toLowerCase();
 
-      // ✅ If user picked a filter, event must match it.
-      // Use includes() so “Ottawa” matches “Ottawa (Downtown)” etc.
-      const matchCountry = !co || evCountry.includes(co);
-      const matchProvince = !pr || evProvince.includes(pr);
-      const matchCity = !cc || evCity.includes(cc);
-      const matchGenre = !gg || evGenre.includes(gg);
+    // ✅ If user picked a filter, event must match it.
+    // Use includes() so “Ottawa” matches “Ottawa (Downtown)” etc.
+    const matchCountry = !co || evCountry.includes(co);
+    const matchProvince = !pr || evProvince.includes(pr);
+    const matchCity = !cc || evCity.includes(cc);
+    const matchGenre = !gg || evGenre.includes(gg);
 
-      return matchCountry && matchProvince && matchCity && matchGenre;
-    })
-    .slice(0, 200);
+    return matchCountry && matchProvince && matchCity && matchGenre;
+  });
+
+  // ✅ De-dupe: if multiple rows share same DATE + EVENT NAME, show it once
+  // Keep the first one (your query orders created_at desc, so this keeps the newest row)
+  const seen = new Set<string>();
+  const unique: EventRow[] = [];
+
+  for (const ev of filteredUpcoming) {
+    const d = (ev.show_date ?? "").slice(0, 10);
+    const nameKey = normSpaces(ev.note ?? "").toUpperCase();
+
+    // if there is no name, fall back to id so unnamed events don’t collapse together
+    const key = nameKey ? `${d}::${nameKey}` : `ID::${ev.id}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(ev);
+
+    if (unique.length >= 200) break;
+  }
+
+  return unique;
 }, [calendarEvents, country, province, city, genre]);
+
 
   // ============== DATA LOAD ==============
   async function loadTracks() {
