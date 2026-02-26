@@ -152,6 +152,27 @@ export default function PublicBandPage({
   params: Promise<{ band: string }>;
 }) {
 
+async function creditBandPageHitOnce(slug: string) {
+  const clean = (slug ?? "").trim().toLowerCase();
+  if (!clean) return;
+
+  // ✅ prevent double-count (dev StrictMode) + spam refresh (same tab)
+  const key = `sl_band_hit_v1:${clean}`;
+  if (typeof window !== "undefined") {
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+  }
+
+  const { error } = await supabase.rpc("increment_ad_share_for_band_slugs", {
+    p_band_slugs: [clean],
+  });
+
+  if (error) {
+    // don't break page load
+    console.warn("band page hit increment failed:", error.message);
+  }
+}
+
 async function buyTrack(track: TrackView) {
   try {
     const res = await fetch("/api/checkout", {
@@ -366,6 +387,15 @@ useEffect(() => {
   loadGalleryPublic();
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [profile?.user_id, bandSlug]);
+
+useEffect(() => {
+  if (!bandSlug) return;
+
+  // ✅ count a band "view hit" once per tab/session
+  creditBandPageHitOnce(bandSlug);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [bandSlug]);
 
   return (
     <main
