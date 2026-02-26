@@ -453,6 +453,26 @@ const calendarMatches = useMemo(() => {
 }, [calendarEvents, country, province, city, genre]);
 
 
+async function creditAdShareOnce(perPageTracks: TrackView[]) {
+  if (offlineMode) return;
+
+  const slugs = Array.from(
+    new Set((perPageTracks ?? []).map((t) => (t.band_slug ?? "").trim()).filter(Boolean))
+  );
+
+  if (!slugs.length) return;
+
+  const { error } = await supabase.rpc("increment_ad_share_for_band_slugs", {
+    p_band_slugs: slugs,
+  });
+
+  if (error) {
+    // Don’t break the radio if counting fails
+    console.warn("ad_share increment failed:", error.message);
+  }
+}
+
+
   // ============== DATA LOAD ==============
   async function loadTracks() {
     if (offlineMode) {
@@ -558,6 +578,7 @@ const calendarMatches = useMemo(() => {
       });
 
       setTracks(mapped);
+   
 
       if (cleanEventName) {
         setStatus(`Event search: ${cleanEventName}`);
@@ -624,6 +645,8 @@ if (qSlugLower) {
     }));
 
     setTracks(mappedAll);
+  
+
 
     // keep genre dropdown stable
     setMasterGenres((prev) => {
@@ -703,6 +726,7 @@ if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
     }));
 
     setTracks(mapped);
+   
 
     setMasterGenres((prev) => {
       const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
@@ -959,20 +983,29 @@ if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
     setFiltersOpen(false);
   }
 
-  async function radioLetsGo() {
-    setHasStarted(true);
-    closeFilters();
+async function radioLetsGo() {
+  setHasStarted(true);
+  closeFilters();
 
-    if (!offlineMode) {
-      await loadTracks();
-    }
+  if (!offlineMode) {
+    await loadTracks();
 
-    if (!nowPlaying) {
-      setTimeout(() => {
-        go();
-      }, 30);
-    }
+    // ✅ Count ONE hit per band for the tracks that were loaded by GO
+    // Use the current `tracks` state from before the load? Nope — state updates are async.
+    // So we credit based on what loadTracks() just loaded by reading from the DOM? also nope.
+    // Easiest: credit using the "filtered" list after load has had a tick to update.
+    setTimeout(() => {
+      // credit based on whatever is currently loaded and visible for this GO action
+      creditAdShareOnce(filtered);
+    }, 0);
   }
+
+  if (!nowPlaying) {
+    setTimeout(() => {
+      go();
+    }, 30);
+  }
+}
 
 const overlayTitle = useMemo(() => {
   if (date) return "Event Radio";
