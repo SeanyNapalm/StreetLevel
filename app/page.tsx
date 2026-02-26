@@ -301,6 +301,11 @@ export default function HomePage() {
 
 const LOCATION_SELECT_MAX = 430;
 
+// ✅ Filter panel sizing (single source of truth)
+const FILTER_PANEL_MAX = 560;        // overall modal width cap (shrink this to taste)
+const FILTER_FIELD_MAX = 430;        // max width for “main” inputs/selects inside
+const FILTER_GO_MAX = FILTER_FIELD_MAX; // make GO button match field width
+
 function clearLocation() {
   setCountry("");
   setProvince("");
@@ -1328,7 +1333,7 @@ const overlayTitle = useMemo(() => {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "min(720px, 96vw)",
+              width: `min(${FILTER_PANEL_MAX}px, 96vw)`,
               borderRadius: 18,
               border: "1px solid rgba(255, 255, 255, 0.34)",
               background: "rgba(255,255,255,0.18)",
@@ -1411,16 +1416,25 @@ const overlayTitle = useMemo(() => {
   ) : null}
 </div>
 
-            <div
-              style={{
-                padding: 14,
-                display: "grid",
-                gap: 12,
-                overflowY: "auto",
-                WebkitOverflowScrolling: "touch",
-              }}
-            >
-              <div style={{ display: "grid", gap: 10 }}>
+<div
+  style={{
+    padding: 14,
+    display: "grid",
+    gap: 12,
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+  }}
+>
+  {/* ✅ Centered narrow column for ALL controls */}
+  <div
+    style={{
+      width: "100%",
+      maxWidth: `${FILTER_FIELD_MAX}px`,
+      margin: "0 auto",
+      display: "grid",
+      gap: 10,
+    }}
+  >
                 {/* WHAT */}
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>What Genre?:)</div>
@@ -1484,7 +1498,7 @@ const overlayTitle = useMemo(() => {
 
 {whereStep === "country" ? (
   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
       <select
         value={country}
         onChange={(e) => pickCountry(e.target.value)}
@@ -1524,7 +1538,7 @@ const overlayTitle = useMemo(() => {
 
 {whereStep === "province" ? (
   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
       <select
         value={province}
         onChange={(e) => pickProvince(e.target.value)}
@@ -1564,7 +1578,7 @@ const overlayTitle = useMemo(() => {
 
 {whereStep === "city" ? (
   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
       <select
         value={city}
         onChange={(e) => pickCity(e.target.value)}
@@ -1615,7 +1629,7 @@ const overlayTitle = useMemo(() => {
 
 {whereStep === "neighbourhood" ? (
   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <div style={{ flex: 1, minWidth: 0, maxWidth: LOCATION_SELECT_MAX }}>
+    <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
       <select
         value={neighbourhood}
         onChange={(e) => pickNeighbourhood(e.target.value)}
@@ -1672,7 +1686,7 @@ const overlayTitle = useMemo(() => {
                         style={{
                           flex: 1,
                           minWidth: 0,
-                          maxWidth: "430px",
+                          maxWidth: `${FILTER_FIELD_MAX}px`,
                         }}
                       />
 
@@ -1711,12 +1725,13 @@ const overlayTitle = useMemo(() => {
                       Band / song search:
                     </div>
 
-                    <input
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="Band name (or song title)"
-                      className="sl-input"
-                    />
+<input
+  value={q}
+  onChange={(e) => setQ(e.target.value)}
+  placeholder="Band name (or song title)"
+  className="sl-input"
+  style={{ width: "100%", maxWidth: `${FILTER_FIELD_MAX}px` }}
+/>
                   </div>
                 </div>
 
@@ -1742,22 +1757,25 @@ const overlayTitle = useMemo(() => {
                     marginTop: 6,
                   }}
                 >
-                  <button
-                    onClick={radioLetsGo}
-                    style={{
-                      width: "100%",
-                      padding: "14px 14px",
-                      borderRadius: 14,
-                      border: "1px solid #ddd",
-                      fontWeight: 950,
-                      background: "black",
-                      color: "#2bff00",
-                      cursor: "pointer",
-                      letterSpacing: 0.6,
-                    }}
+<button
+  onClick={radioLetsGo}
+  style={{
+    width: "100%",
+    maxWidth: `${FILTER_GO_MAX}px`,
+    margin: "0 auto",
+    display: "block",
+    padding: "14px 14px",
+    borderRadius: 14,
+    border: "1px solid #ddd",
+    fontWeight: 950,
+    background: "black",
+    color: "#2bff00",
+    cursor: "pointer",
+    letterSpacing: 0.6,
+  }}
                     title="Start the radio with whatever you picked (or nothing!)"
                   >
-                    RADIO LETS GO
+                    RADIO LETS GO!
                   </button>
                 </div>
 
