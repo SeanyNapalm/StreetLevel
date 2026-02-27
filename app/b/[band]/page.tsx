@@ -4,6 +4,10 @@ import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
 import StreetLevelHeader from "../../components/StreetLevelHeader";
+import { formatShowDate } from "../../../lib/date";
+
+
+
 
 type TrackRow = {
   id: string;
@@ -791,7 +795,7 @@ return (
 
     <div style={{ minWidth: 0 }}>
       <div style={{ fontWeight: 950 }}>
-        {(ev.show_date ?? "").slice(0, 10)} — {normSpaces(ev.note) || "(Unnamed event)"}
+        {formatShowDate(ev.show_date, { weekday: true })} — {normSpaces(ev.note) || "(Unnamed event)"}
       </div>
 
       <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
