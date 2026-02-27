@@ -639,34 +639,44 @@ useEffect(() => {
     const qLower = qClean.toLowerCase();
     const qSlugLower = qSlug.toLowerCase();
 
-    // ✅ BAND MODE: if q exactly matches a band_slug, load ALL tracks for that band
-    if (qSlugLower) {
-      const candidates = Array.from(new Set([qSlugLower, qLower].filter(Boolean)));
+  // ✅ BAND MODE: if q matches a band (by band_name/display_name/slug), load ALL tracks for that band
+    if (qClean) {
+      const qLike = `%${qClean}%`;
+      const qSlugGuess = qClean.trim().toLowerCase().replace(/\s+/g, "-"); // "1st show" -> "1st-show"
 
-      let matchedSlug = "";
+      // Try band_users first (human-friendly)
+      const { data: bands, error: bandErr } = await supabase
+        .from("band_users")
+        .select("band_slug, band_name, display_name")
+        .or(
+          [
+            `band_slug.eq.${qSlugGuess}`,
+            `band_slug.eq.${qClean.toLowerCase()}`,
+            `band_name.ilike.${qLike}`,
+            `display_name.ilike.${qLike}`,
+          ].join(",")
+        )
+        .limit(10);
 
-      for (const cand of candidates) {
-        const { data: one, error: oneErr } = await supabase
-          .from("tracks")
-          .select("band_slug")
-          .eq("band_slug", cand)
-          .limit(1);
-
-        if (oneErr) {
-          setStatus(`Band check error: ${oneErr.message}`);
-          break;
-        }
-
-        if (one && one.length) {
-          matchedSlug = one[0].band_slug;
-          break;
-        }
+      if (bandErr) {
+        console.warn("Band lookup error:", bandErr.message);
       }
+
+      const best = (bands ?? []).find((b) => {
+        const bn = (b.band_name ?? "").trim().toLowerCase();
+        const dn = (b.display_name ?? "").trim().toLowerCase();
+        const qs = qClean.trim().toLowerCase();
+        return bn === qs || dn === qs;
+      }) ?? (bands?.[0] ?? null);
+
+      const matchedSlug = best?.band_slug?.trim() ?? "";
 
       if (matchedSlug) {
         const { data: all, error: allErr } = await supabase
           .from("tracks")
-          .select("id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,created_at")
+          .select(
+            "id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,created_at"
+          )
           .eq("band_slug", matchedSlug)
           .order("created_at", { ascending: false });
 
@@ -695,7 +705,7 @@ useEffect(() => {
           return Array.from(s).sort((a, b) => a.localeCompare(b));
         });
 
-        setStatus(`Band mode: ${matchedSlug} • ${mappedAll.length} song(s)`);
+        setStatus(`Band mode: ${best?.band_name ?? matchedSlug} • ${mappedAll.length} song(s)`);
         return mappedAll; // ✅ IMPORTANT: don't call the radio RPC
       }
     }
