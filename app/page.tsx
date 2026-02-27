@@ -483,6 +483,12 @@ useEffect(() => {
       if (unique.length >= 200) break;
     }
 
+    unique.sort((a, b) => {
+  const da = (a.show_date ?? "").slice(0, 10);
+  const db = (b.show_date ?? "").slice(0, 10);
+  return da.localeCompare(db);
+});
+
     return unique;
   }, [calendarEvents, country, province, city, genre]);
 
