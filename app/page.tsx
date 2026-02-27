@@ -228,7 +228,7 @@ export default function HomePage() {
   const [hasStarted, setHasStarted] = useState(false);
 
   // ✅ Splash screen (one-time per session)
-  const [splashPhase, setSplashPhase] = useState<"off" | "show" | "fade">("off");
+  const [splashPhase, setSplashPhase] = useState<"off" | "show" | "fade">("show");
 
   // mobile detection (simple)
   const [isNarrow, setIsNarrow] = useState(false);
@@ -283,31 +283,57 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+// ✅ After first load (and after the splash), render the radio UI behind the filters
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  // wait until splash is gone so it still feels clean
+  if (splashPhase !== "off") return;
+
+  // show the radio layout behind the modal, but don't autoplay
+  setHasStarted(true);
+
+  // make sure we don't accidentally have something playing
+  setNowPlaying(null);
+  setAutoplayBlocked(false);
+  if (audioRef.current) {
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+  }
+
+  // NOTE: We are NOT calling go() here.
+}, [splashPhase]);
+
+
+
   // ✅ One-time splash (per session)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+useEffect(() => {
+  if (typeof window === "undefined") return;
 
-    const KEY = "sl_splash_seen_v1";
-    const already = sessionStorage.getItem(KEY);
+  const KEY = "sl_splash_seen_v1";
+  const already = sessionStorage.getItem(KEY);
 
-    if (already) return;
+  // ✅ If already seen, kill splash immediately (prevents any weird fade)
+  if (already) {
+    setSplashPhase("off");
+    return;
+  }
 
-    sessionStorage.setItem(KEY, "1");
+  sessionStorage.setItem(KEY, "1");
 
-    // timings (tweak these)
-    const SHOW_MS = 1200; // hold
-    const FADE_MS = 3300; // fade duration
+  const SHOW_MS = 1200;
+  const FADE_MS = 3300;
 
-    setSplashPhase("show");
+  setSplashPhase("show");
 
-    const t1 = window.setTimeout(() => setSplashPhase("fade"), SHOW_MS);
-    const t2 = window.setTimeout(() => setSplashPhase("off"), SHOW_MS + FADE_MS + 50);
+  const t1 = window.setTimeout(() => setSplashPhase("fade"), SHOW_MS);
+  const t2 = window.setTimeout(() => setSplashPhase("off"), SHOW_MS + FADE_MS + 50);
 
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
-  }, []);
+  return () => {
+    window.clearTimeout(t1);
+    window.clearTimeout(t2);
+  };
+}, []);
 
   // ✅ Filter panel sizing (single source of truth)
   const FILTER_PANEL_MAX = 560; // overall modal width cap (shrink this to taste)
