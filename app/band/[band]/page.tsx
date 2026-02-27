@@ -4,6 +4,7 @@
   import { useRouter } from "next/navigation";
   import { supabase } from "../../../lib/supabaseClient";
   import StreetLevelHeader from "../../components/StreetLevelHeader";
+  import { formatShowDate } from "../../../lib/date";
 
   type EventRow = {
     id: string;
@@ -26,7 +27,7 @@
     // ✅ location snapshot copied from profile at upload time
     country: string | null;
     province: string | null;
-    neighbourhood: string | null;
+
     city: string;
 
     // keep genre on the track for now
@@ -275,7 +276,7 @@
       setStatus("Loading tracks...");
       const { data, error } = await supabase
         .from("tracks")
-        .select("id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,price_cents,created_at")
+        .select("id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,price_cents,created_at")
         .eq("band_slug", bandSlug)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false });
@@ -526,7 +527,7 @@ async function uploadOneTrack(file: File, idx: number, total: number) {
     country: cleanCountry,
     province: cleanProvince,
     city: cleanCity,
-    neighbourhood: null, // (tracks still has this column for now; we just aren’t using it)
+    
 
     genre: cleanGenre,
     is_radio: true,
@@ -1838,7 +1839,7 @@ async function onUpload(filesOrOne: FileList | File) {
               )}
             </div>
 
-            {/* Submissions list */}
+            {/* show Submissions list */}
             <aside style={{ border: "1px solid #eee", borderRadius: 16, padding: 12, display: "grid", gap: 10 }}>
               <div style={{ fontWeight: 950, letterSpacing: 0.7 }}>Your submitted shows</div>
 
@@ -1884,7 +1885,9 @@ async function onUpload(filesOrOne: FileList | File) {
 
                         <div style={{ minWidth: 0 }}>
                           
-                        <div style={{ fontWeight: 900 }}>{ev.show_date}</div>
+                        <div style={{ fontWeight: 900 }}>
+                          {formatShowDate(ev.show_date, { weekday: true })}
+                        </div>
 
                           {ev.note ? (
                             <div style={{ fontSize: 12, fontWeight: 950, marginTop: 4, letterSpacing: 0.4 }}>
