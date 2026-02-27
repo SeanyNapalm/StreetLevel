@@ -25,7 +25,12 @@ type BandUserProfileRow = {
   band_slug: string;
   band_name: string | null;
   display_name: string | null;
+
+  country: string | null;
+  province: string | null;
   city: string | null;
+  genre: string | null;
+
   bio: string | null;
   avatar_path: string | null;
 };
@@ -37,7 +42,7 @@ type EventRow = {
   // ✅ new snapshot fields (match radio filters)
   country: string | null;
   province: string | null;
-  neighbourhood: string | null;
+
 
   city: string | null;
   genre: string | null;
@@ -138,9 +143,9 @@ function buildEventLink(ev: EventRow) {
 
 function prettyEventWhere(ev: EventRow) {
   // country / province / city / neighbourhood (only show what exists)
-  const parts = [ev.country, ev.province, ev.city, ev.neighbourhood]
-    .map((x) => norm(x))
-    .filter(Boolean);
+const parts = [ev.country, ev.province, ev.city]
+  .map((x) => norm(x))
+  .filter(Boolean);
 
   return parts.length ? parts.join(" • ") : "—";
 }
@@ -245,9 +250,9 @@ async function buyTrack(track: TrackView) {
 
     const { data, error } = await supabase
       .from("band_users")
-      .select(
-        "user_id, band_slug, band_name, display_name, city, bio, avatar_path"
-      )
+.select(
+  "user_id, band_slug, band_name, display_name, country, province, city, genre, bio, avatar_path"
+)
       .eq("band_slug", bandSlug)
       .order("user_id", { ascending: true })
       .limit(1)
@@ -302,7 +307,7 @@ const { data, error } = await supabase
     const { data, error } = await supabase
       .from("events")
 .select(
-  "id,band_slug,country,province,neighbourhood,city,genre,show_date,note,flyer_path,track_id,created_at"
+  "id,band_slug,country,province,city,genre,show_date,note,flyer_path,track_id,created_at"
 )
       .eq("band_slug", bandSlug)
       .gte("show_date", todayStr)
@@ -514,9 +519,24 @@ useEffect(() => {
 
           <div style={{ fontWeight: 950, fontSize: 18 }}>{prettyBand}</div>
 
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
-            {(profile?.city ?? "").trim() ? `${profile?.city}` : "City not set"}
-          </div>
+<div style={{ fontSize: 12, opacity: 0.75, fontWeight: 800 }}>
+  {(() => {
+    const g = norm(profile?.genre);
+    const city = norm(profile?.city);
+    const prov = norm(profile?.province);
+    const country = norm(profile?.country);
+
+    const where = [city, prov, country].filter(Boolean).join(", ");
+
+    if (!g && !where) return "Location not set";
+    if (!g) return where;
+    if (!where) return g;
+
+    return `${g} — ${where}`;
+  })()}
+</div>
+
+
 
           <div
             style={{
@@ -789,7 +809,7 @@ return (
         }}
         title={trackTitle}
       >
-        Showcase: <b>{trackTitle}</b>
+        Chosen Song: <b>{trackTitle}</b>
       </div>
 
       {/* ✅ clickable event link */}
