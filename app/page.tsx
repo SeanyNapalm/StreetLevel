@@ -455,6 +455,12 @@ useEffect(() => {
       const matchCity = !cc || evCity.includes(cc);
       const matchGenre = !gg || evGenre.includes(gg);
 
+      unique.sort((a, b) => {
+        const da = (a.show_date ?? "").slice(0, 10);
+        const db = (b.show_date ?? "").slice(0, 10);
+        return da.localeCompare(db);
+      });
+
       return matchCountry && matchProvince && matchCity && matchGenre;
     });
 
@@ -1882,35 +1888,73 @@ useEffect(() => {
                 </div>
               ) : null}
 
-              {calendarMatches.map((ev) => {
-                const d = formatShowDate(ev.show_date, { weekday: true });
-                const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
-                const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
+{calendarMatches.map((ev) => {
+  const d = formatShowDate(ev.show_date, { weekday: true });
+  const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
+  const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
 
-                return (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    onClick={() => pickEventAndPlay(ev)}
-                    style={{
-                      textAlign: "left",
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: 14,
-                      border: "1px solid rgba(255,255,255,0.18)",
-                      background: "rgba(255,255,255,0.08)",
-                      color: "white",
-                      cursor: "pointer",
-                    }}
-                    title="Pick this event and start playing"
-                  >
-                    <div style={{ fontWeight: 950 }}>
-                      {d} — {name}
-                    </div>
-                    <div style={{ fontSize: 12, opacity: 0.85 }}>{meta}</div>
-                  </button>
-                );
-              })}
+  const flyer = ev.flyer_path ? withCacheBust(getFlyerUrl(ev.flyer_path)) : "";
+
+  return (
+    <button
+      key={ev.id}
+      type="button"
+      onClick={() => pickEventAndPlay(ev)}
+      style={{
+        textAlign: "left",
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 14,
+        border: "1px solid rgba(255,255,255,0.18)",
+        background: "rgba(255,255,255,0.08)",
+        color: "white",
+        cursor: "pointer",
+
+        display: "grid",
+        gridTemplateColumns: "52px 1fr",
+        gap: 12,
+        alignItems: "center",
+      }}
+      title="Pick this event and start playing"
+    >
+      {flyer ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={flyer}
+          alt=""
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 12,
+            objectFit: "cover",
+            border: "1px solid rgba(255,255,255,0.16)",
+            background: "rgba(0,0,0,0.35)",
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.16)",
+            background: "rgba(0,0,0,0.25)",
+            opacity: 0.55,
+          }}
+        />
+      )}
+
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {d} — {name}
+        </div>
+        <div style={{ fontSize: 12, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {meta}
+        </div>
+      </div>
+    </button>
+  );
+})}
             </div>
           </div>
         </div>
