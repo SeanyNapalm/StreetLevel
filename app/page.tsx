@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 import StreetLevelHeader from "./components/StreetLevelHeader";
+import { formatShowDate } from "../lib/date";
+
 
 type EventRow = {
   id: string;
@@ -1881,7 +1883,7 @@ useEffect(() => {
               ) : null}
 
               {calendarMatches.map((ev) => {
-                const d = (ev.show_date ?? "").slice(0, 10);
+                const d = formatShowDate(ev.show_date, { weekday: true });
                 const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
                 const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
 
