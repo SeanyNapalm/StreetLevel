@@ -142,7 +142,7 @@ function buildEventLink(ev: EventRow) {
 }
 
 function prettyEventWhere(ev: EventRow) {
-  // country / province / city / neighbourhood (only show what exists)
+  // country / province / city  (only show what exists)
 const parts = [ev.country, ev.province, ev.city]
   .map((x) => norm(x))
   .filter(Boolean);

@@ -30,7 +30,7 @@ type TrackRow = {
   // ✅ location snapshot copied from profile at upload time
   country: string | null;
   province: string | null;
-  neighbourhood: string | null;
+
   city: string;
 
   genre: string;
@@ -166,14 +166,8 @@ const CITIES_BY_PROVINCE: Record<string, string[]> = {
   "Northwest Territories": ["Yellowknife"],
 };
 
-const NEIGHBOURHOODS_BY_CITY: Record<string, string[]> = {
-  Ottawa: ["Vanier", "Centretown", "ByWard Market", "Hintonburg", "Old Ottawa South", "Nepean", "Barrhaven", "Kanata"],
-  Toronto: ["Downtown", "Scarborough", "North York", "Etobicoke", "The Annex", "Parkdale"],
-  Montreal: ["Plateau", "Mile End", "Downtown", "Hochelaga", "Verdun"],
-  Gatineau: ["Hull", "Aylmer"],
-};
 
-type WhereStep = "country" | "province" | "city" | "neighbourhood";
+type WhereStep = "country" | "province" | "city";
 
 export default function HomePage() {
   const [status, setStatus] = useState("");
@@ -191,7 +185,7 @@ export default function HomePage() {
   const [country, setCountry] = useState("");
   const [province, setProvince] = useState("");
   const [city, setCity] = useState("");
-  const [neighbourhood, setNeighbourhood] = useState("");
+
   const [whereStep, setWhereStep] = useState<WhereStep>("country");
 
   // event / offline
@@ -248,7 +242,7 @@ export default function HomePage() {
     const co = url.searchParams.get("country") ?? "";
     const pr = url.searchParams.get("province") ?? "";
     const ci = url.searchParams.get("city") ?? "";
-    const nb = url.searchParams.get("neighbourhood") ?? "";
+ 
 
     const g = url.searchParams.get("genre") ?? "";
     const d = url.searchParams.get("date") ?? "";
@@ -259,7 +253,7 @@ export default function HomePage() {
     if (co) setCountry(co);
     if (pr) setProvince(pr);
     if (ci) setCity(ci);
-    if (nb) setNeighbourhood(nb);
+   
 
     if (g) setGenre(g);
     if (d) setDate(d);
@@ -269,13 +263,12 @@ export default function HomePage() {
     if (off === "1" || off.toLowerCase() === "true") setOfflineMode(true);
 
     // set whereStep based on deepest param
-    if (nb) setWhereStep("neighbourhood");
-    else if (ci) setWhereStep("city");
+     if (ci) setWhereStep("city");
     else if (pr) setWhereStep("province");
     else setWhereStep("country");
 
     // If any filters exist, don't force the hero overlay forever
-    const any = Boolean(co || pr || ci || nb || g || d || qq || evn || off);
+    const any = Boolean(co || pr || ci || g || d || qq || evn || off);
     if (any) {
       setFiltersOpen(false);
       setHasStarted(true);
@@ -344,7 +337,7 @@ useEffect(() => {
     setCountry("");
     setProvince("");
     setCity("");
-    setNeighbourhood("");
+  
     setWhereStep("country");
   }
 
@@ -369,7 +362,7 @@ useEffect(() => {
     setQ("");
 
     // ✅ Ensure the progressive WHERE UI is at the deepest available level
-    if (ev.city) setWhereStep("neighbourhood");
+    if (ev.city) setWhereStep("city");
     else if (ev.province) setWhereStep("city");
     else if (ev.country) setWhereStep("province");
     else setWhereStep("country");
@@ -394,7 +387,7 @@ useEffect(() => {
     setOrDel("country", country);
     setOrDel("province", province);
     setOrDel("city", city);
-    setOrDel("neighbourhood", neighbourhood);
+
 
     setOrDel("genre", genre);
     setOrDel("date", date);
@@ -585,7 +578,7 @@ useEffect(() => {
 
       const { data: ts, error: tErr } = await supabase
         .from("tracks")
-        .select("id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,created_at")
+        .select("id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,created_at")
         .in("id", trackIds);
 
       if (tErr) {
@@ -675,7 +668,7 @@ useEffect(() => {
         const { data: all, error: allErr } = await supabase
           .from("tracks")
           .select(
-            "id,title,country,province,neighbourhood,city,genre,is_radio,band_slug,file_path,art_path,created_at"
+            "id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,created_at"
           )
           .eq("band_slug", matchedSlug)
           .order("created_at", { ascending: false });
@@ -715,7 +708,7 @@ useEffect(() => {
       p_country: country || null,
       p_province: province || null,
       p_city: city || null,
-      p_neighbourhood: neighbourhood || null,
+
       p_genre: genre || null,
       p_q: qClean || null,
     });
@@ -726,7 +719,7 @@ useEffect(() => {
         p_country: country || null,
         p_province: province || null,
         p_city: city || null,
-        p_neighbourhood: neighbourhood || null,
+
         p_genre: genre || null,
         p_q: qSlug || null,
       });
@@ -771,7 +764,7 @@ useEffect(() => {
     loadTracks();
     syncUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, country, province, city, neighbourhood, genre, q, eventShowName, offlineMode]);
+ }, [date, country, province, city, genre, q, eventShowName, offlineMode]);
 
   // ============== OPTIONS ==============
   const genreOptions = useMemo(() => {
@@ -801,10 +794,10 @@ useEffect(() => {
     const co = country.trim().toLowerCase();
     const pr = province.trim().toLowerCase();
     const cc = city.trim().toLowerCase();
-    const nb = neighbourhood.trim().toLowerCase();
+
     const gg = genre.trim().toLowerCase();
 
-    const hasFilter = Boolean(qq || co || pr || cc || nb || gg || date.trim());
+    const hasFilter = Boolean(qq || co || pr || cc || gg || date.trim());
     if (!hasFilter) return tracks;
 
     return tracks.filter((t) => {
@@ -817,12 +810,12 @@ useEffect(() => {
       const matchCountry = !co || (t.country ?? "").toLowerCase().includes(co);
       const matchProvince = !pr || (t.province ?? "").toLowerCase().includes(pr);
       const matchCity = !cc || (t.city ?? "").toLowerCase().includes(cc);
-      const matchNeighbourhood = !nb || (t.neighbourhood ?? "").toLowerCase().includes(nb);
+      
       const matchGenre = !gg || (t.genre ?? "").toLowerCase().includes(gg);
 
-      return matchQ && matchCountry && matchProvince && matchCity && matchNeighbourhood && matchGenre;
+      return matchQ && matchCountry && matchProvince && matchCity && matchGenre;
     });
-  }, [tracks, q, country, province, city, neighbourhood, genre, date]);
+  }, [tracks, q, country, province, city, genre, date]);
 
   // Build a fresh shuffled queue whenever the filtered list changes
   useEffect(() => {
@@ -945,30 +938,29 @@ useEffect(() => {
 
   // ============== Progressive WHERE handlers ==============
   const prettyBreadcrumb = useMemo(() => {
-    const parts = [country, province, city, neighbourhood].map((x) => normSpaces(x)).filter(Boolean);
+    const parts = [country, province, city].map((x) => normSpaces(x)).filter(Boolean);
     return parts;
-  }, [country, province, city, neighbourhood]);
+  }, [country, province, city]);
 
   function resetBelow(step: WhereStep) {
     if (step === "country") {
       setProvince("");
       setCity("");
-      setNeighbourhood("");
+
       setWhereStep("country");
       return;
     }
     if (step === "province") {
       setCity("");
-      setNeighbourhood("");
+
       setWhereStep("province");
       return;
     }
     if (step === "city") {
-      setNeighbourhood("");
+
       setWhereStep("city");
       return;
     }
-    setWhereStep("neighbourhood");
   }
 
   function pickCountry(v: string) {
@@ -976,7 +968,7 @@ useEffect(() => {
     setCountry(clean);
     setProvince("");
     setCity("");
-    setNeighbourhood("");
+
     setWhereStep("province");
   }
 
@@ -984,22 +976,17 @@ useEffect(() => {
     const clean = toTitleCaseSmart(v);
     setProvince(clean);
     setCity("");
-    setNeighbourhood("");
+
     setWhereStep("city");
   }
 
   function pickCity(v: string) {
     const clean = toTitleCaseSmart(v);
     setCity(clean);
-    setNeighbourhood("");
-    setWhereStep("neighbourhood");
+    setWhereStep("city");
   }
 
-  function pickNeighbourhood(v: string) {
-    const clean = toTitleCaseSmart(v);
-    setNeighbourhood(clean);
-    setWhereStep("neighbourhood");
-  }
+
 
   function openFilters() {
     setFiltersOpen(true);
@@ -1175,10 +1162,9 @@ useEffect(() => {
 
             {/* Event mode note */}
             {date ? (
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>
-                Event radio currently uses <b>City + Genre</b> for matching (province/country/neighbourhood don’t exist on
-                events yet).
-              </div>
+ <div style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>
+  Event radio matches using <b>City + Genre</b>.
+</div>
             ) : null}
 
             {/* ===== MAIN LAYOUT ===== */}
@@ -1540,7 +1526,7 @@ useEffect(() => {
                               if (idx === 0) resetBelow("country");
                               if (idx === 1) resetBelow("province");
                               if (idx === 2) resetBelow("city");
-                              if (idx === 3) resetBelow("neighbourhood");
+                              
                             }}
                             style={{
                               padding: "6px 10px",
@@ -1560,7 +1546,7 @@ useEffect(() => {
                     </div>
                   ) : (
                     <div style={{ fontSize: 12, color: "white", opacity: 0.65 }}>
-                      Optional. Pick country/province/city/neighbourhood… or leave blank.
+                      Optional. Pick country/province/city.. or leave blank.
                     </div>
                   )}
 
@@ -1585,7 +1571,7 @@ useEffect(() => {
                       <button
                         type="button"
                         onClick={clearLocation}
-                        disabled={!country && !province && !city && !neighbourhood}
+                        disabled={!country && !province && !city}
                         style={{
                           padding: "12px 14px",
                           borderRadius: 12,
@@ -1593,9 +1579,9 @@ useEffect(() => {
                           background: "black",
                           color: "#2bff00",
                           fontWeight: 950,
-                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+                          cursor: !country && !province && !city ? "not-allowed" : "pointer",
                           whiteSpace: "nowrap",
-                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+                          opacity: !country && !province && !city ? 0.45 : 1,
                         }}
                         title="Clear all location filters"
                       >
@@ -1625,7 +1611,7 @@ useEffect(() => {
                       <button
                         type="button"
                         onClick={clearLocation}
-                        disabled={!country && !province && !city && !neighbourhood}
+                        disabled={!country && !province && !city}
                         style={{
                           padding: "12px 14px",
                           borderRadius: 12,
@@ -1633,9 +1619,9 @@ useEffect(() => {
                           background: "black",
                           color: "#2bff00",
                           fontWeight: 950,
-                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+                          cursor: !country && !province && !city ? "not-allowed" : "pointer",
                           whiteSpace: "nowrap",
-                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+                          opacity: !country && !province && !city ? 0.45 : 1,
                         }}
                         title="Clear all location filters"
                       >
@@ -1676,7 +1662,7 @@ useEffect(() => {
                       <button
                         type="button"
                         onClick={clearLocation}
-                        disabled={!country && !province && !city && !neighbourhood}
+                        disabled={!country && !province && !city}
                         style={{
                           padding: "12px 14px",
                           borderRadius: 12,
@@ -1684,9 +1670,9 @@ useEffect(() => {
                           background: "black",
                           color: "#2bff00",
                           fontWeight: 950,
-                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
+                          cursor: !country && !province && !city ? "not-allowed" : "pointer",
                           whiteSpace: "nowrap",
-                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
+                          opacity: !country && !province && !city ? 0.45 : 1,
                         }}
                         title="Clear all location filters"
                       >
@@ -1695,45 +1681,7 @@ useEffect(() => {
                     </div>
                   ) : null}
 
-                  {whereStep === "neighbourhood" ? (
-                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
-                        <select
-                          value={neighbourhood}
-                          onChange={(e) => pickNeighbourhood(e.target.value)}
-                          className="sl-select"
-                          style={{ width: "100%" }}
-                        >
-                          <option value="">Any neighbourhood</option>
-                          {(NEIGHBOURHOODS_BY_CITY[city] ?? []).map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
 
-                      <button
-                        type="button"
-                        onClick={clearLocation}
-                        disabled={!country && !province && !city && !neighbourhood}
-                        style={{
-                          padding: "12px 14px",
-                          borderRadius: 12,
-                          border: "1px solid #ddd",
-                          background: "black",
-                          color: "#2bff00",
-                          fontWeight: 950,
-                          cursor: !country && !province && !city && !neighbourhood ? "not-allowed" : "pointer",
-                          whiteSpace: "nowrap",
-                          opacity: !country && !province && !city && !neighbourhood ? 0.45 : 1,
-                        }}
-                        title="Clear all location filters"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  ) : null}
                 </div>
 
                 {/* WHO */}
