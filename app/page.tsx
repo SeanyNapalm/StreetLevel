@@ -427,70 +427,62 @@ useEffect(() => {
     setCalendarEvents((data ?? []) as EventRow[]);
   }
 
-  // ✅ Only show upcoming events + only those matching current filters
-  const calendarMatches = useMemo(() => {
-    const today = localTodayISO();
+ // ✅ Only show upcoming events + only those matching current filters
+const calendarMatches = useMemo(() => {
+  const today = localTodayISO();
 
-    const co = country.trim().toLowerCase();
-    const pr = province.trim().toLowerCase();
-    const cc = city.trim().toLowerCase();
-    const gg = genre.trim().toLowerCase();
+  const co = country.trim().toLowerCase();
+  const pr = province.trim().toLowerCase();
+  const cc = city.trim().toLowerCase();
+  const gg = genre.trim().toLowerCase();
 
-    const filteredUpcoming = calendarEvents.filter((ev) => {
-      const d = (ev.show_date ?? "").slice(0, 10);
-      if (!d) return false;
+  // 1) Filter upcoming + filter-match
+  const filteredUpcoming = calendarEvents.filter((ev) => {
+    const d = (ev.show_date ?? "").slice(0, 10);
+    if (!d) return false;
 
-      // ✅ upcoming only (today or future)
-      if (d < today) return false;
+    // upcoming only
+    if (d < today) return false;
 
-      const evCountry = (ev.country ?? "").toLowerCase();
-      const evProvince = (ev.province ?? "").toLowerCase();
-      const evCity = (ev.city ?? "").toLowerCase();
-      const evGenre = (ev.genre ?? "").toLowerCase();
+    const evCountry = (ev.country ?? "").toLowerCase();
+    const evProvince = (ev.province ?? "").toLowerCase();
+    const evCity = (ev.city ?? "").toLowerCase();
+    const evGenre = (ev.genre ?? "").toLowerCase();
 
-      // ✅ If user picked a filter, event must match it.
-      // Use includes() so “Ottawa” matches “Ottawa (Downtown)” etc.
-      const matchCountry = !co || evCountry.includes(co);
-      const matchProvince = !pr || evProvince.includes(pr);
-      const matchCity = !cc || evCity.includes(cc);
-      const matchGenre = !gg || evGenre.includes(gg);
+    const matchCountry = !co || evCountry.includes(co);
+    const matchProvince = !pr || evProvince.includes(pr);
+    const matchCity = !cc || evCity.includes(cc);
+    const matchGenre = !gg || evGenre.includes(gg);
 
-      unique.sort((a, b) => {
-        const da = (a.show_date ?? "").slice(0, 10);
-        const db = (b.show_date ?? "").slice(0, 10);
-        return da.localeCompare(db);
-      });
+    return matchCountry && matchProvince && matchCity && matchGenre;
+  });
 
-      return matchCountry && matchProvince && matchCity && matchGenre;
-    });
+  // 2) De-dupe by DATE + EVENT NAME (note)
+  const seen = new Set<string>();
+  const unique: EventRow[] = [];
 
-    // ✅ De-dupe: if multiple rows share same DATE + EVENT NAME, show it once
-    // Keep the first one (your query orders created_at desc, so this keeps the newest row)
-    const seen = new Set<string>();
-    const unique: EventRow[] = [];
+  for (const ev of filteredUpcoming) {
+    const d = (ev.show_date ?? "").slice(0, 10);
+    const nameKey = normSpaces(ev.note ?? "").toUpperCase();
 
-    for (const ev of filteredUpcoming) {
-      const d = (ev.show_date ?? "").slice(0, 10);
-      const nameKey = normSpaces(ev.note ?? "").toUpperCase();
+    const key = nameKey ? `${d}::${nameKey}` : `ID::${ev.id}`;
 
-      // if there is no name, fall back to id so unnamed events don’t collapse together
-      const key = nameKey ? `${d}::${nameKey}` : `ID::${ev.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(ev);
 
-      if (seen.has(key)) continue;
-      seen.add(key);
-      unique.push(ev);
+    if (unique.length >= 200) break;
+  }
 
-      if (unique.length >= 200) break;
-    }
+  // 3) Sort AFTER unique exists
+  unique.sort((a, b) => {
+    const da = (a.show_date ?? "").slice(0, 10);
+    const db = (b.show_date ?? "").slice(0, 10);
+    return da.localeCompare(db);
+  });
 
-    unique.sort((a, b) => {
-  const da = (a.show_date ?? "").slice(0, 10);
-  const db = (b.show_date ?? "").slice(0, 10);
-  return da.localeCompare(db);
-});
-
-    return unique;
-  }, [calendarEvents, country, province, city, genre]);
+  return unique;
+}, [calendarEvents, country, province, city, genre]);
 
   async function creditAdShareOnce(perPageTracks: TrackView[]) {
     if (offlineMode) return;
