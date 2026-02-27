@@ -50,7 +50,7 @@
 
     country: string | null;
     province: string | null;
-    neighbourhood: string | null;
+    genre: string | null;
 
     city: string | null;
     bio: string | null;
@@ -185,7 +185,7 @@
     const [profileName, setProfileName] = useState("");
     const [profileCountry, setProfileCountry] = useState("Canada");
     const [profileProvince, setProfileProvince] = useState("Ontario");
-    const [profileNeighbourhood, setProfileNeighbourhood] = useState("");
+    const [profileGenre, setProfileGenre] = useState("Punk");
     const [profileCity, setProfileCity] = useState("Ottawa");
     const [profileBio, setProfileBio] = useState("");
     const [avatarPath, setAvatarPath] = useState<string | null>(null);
@@ -197,13 +197,13 @@
       const provinceOk = (profileProvince ?? "").trim().length >= 2;
       const cityOk = (profileCity ?? "").trim().length >= 2;
 
-      const hood = (profileNeighbourhood ?? "").trim();
-      const hoodOk = hood.length === 0 || hood.length >= 2;
+      const genreOk = (profileGenre ?? "").trim().length >= 2;
 
       const bioOk = (profileBio ?? "").trim().length >= 10;
 
-      return nameOk && countryOk && provinceOk && cityOk && hoodOk && bioOk;
-    }, [profileName, profileCountry, profileProvince, profileCity, profileNeighbourhood, profileBio]);
+      return nameOk && countryOk && provinceOk && cityOk && genreOk && bioOk;
+    }, [profileName, profileCountry, profileProvince, profileCity, profileGenre, profileBio]);
+
 
     // --- NEXT SHOW (events MVP) ---
     const [showDate, setShowDate] = useState<string>("");
@@ -346,7 +346,7 @@
 
         const { data, error } = await supabase
           .from("band_users")
-          .select("user_id, band_slug, band_name, display_name, country, province, neighbourhood, city, bio, avatar_path")
+          .select("user_id, band_slug, band_name, display_name, country, province, genre, city, bio, avatar_path")
           .eq("band_slug", bandSlug)
           .eq("user_id", uid)
           .maybeSingle();
@@ -363,7 +363,7 @@
           const country = toTitleCaseSmart(row.country ?? "") || "Canada";
           const province = toTitleCaseSmart(row.province ?? "") || "Ontario";
           const city = toTitleCaseSmart(row.city ?? "") || "Ottawa";
-          const neighbourhood = toTitleCaseSmart(row.neighbourhood ?? "") || "";
+          const genre = toTitleCaseSmart(row.genre ?? "") || "Punk";
           const bio = row.bio ?? "";
           const av = row.avatar_path ?? null;
 
@@ -371,7 +371,7 @@
           setProfileCountry(country);
           setProfileProvince(province);
           setProfileCity(city);
-          setProfileNeighbourhood(neighbourhood);
+          setProfileGenre(genre);
           setProfileBio(bio);
           setAvatarPath(av);
 
@@ -400,7 +400,7 @@
 
       const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
       const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
-      const cleanNeighbourhood = toTitleCaseSmart(profileNeighbourhood);
+      const cleanGenre = toTitleCaseSmart(profileGenre) || "Punk";
 
       const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
       const cleanBio = normSpaces(profileBio);
@@ -415,7 +415,7 @@
         display_name: cleanName,
         country: cleanCountry,
         province: cleanProvince,
-        neighbourhood: cleanNeighbourhood || null,
+        genre: cleanGenre,
         city: cleanCity,
         bio: cleanBio,
         avatar_path: avatarPath,
@@ -432,7 +432,7 @@
       setProfileName(cleanName);
       setProfileCountry(cleanCountry);
       setProfileProvince(cleanProvince);
-      setProfileNeighbourhood(cleanNeighbourhood);
+      setProfileGenre(cleanGenre);
       setProfileCity(cleanCity);
       setProfileBio(cleanBio);
 
@@ -516,7 +516,7 @@ async function uploadOneTrack(file: File, idx: number, total: number) {
   const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
   const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
   const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
-  const cleanNeighbourhood = toTitleCaseSmart(profileNeighbourhood);
+  const cleanGenre = toTitleCaseSmart(profileGenre) || "Punk";
 
   const ins = await supabase.from("tracks").insert({
     band_slug: bandSlug,
@@ -526,9 +526,9 @@ async function uploadOneTrack(file: File, idx: number, total: number) {
     country: cleanCountry,
     province: cleanProvince,
     city: cleanCity,
-    neighbourhood: cleanNeighbourhood || null,
+    neighbourhood: null, // (tracks still has this column for now; we just aren’t using it)
 
-    genre: "Punk",
+    genre: cleanGenre,
     is_radio: true,
 
     file_path: storagePath,
@@ -1217,16 +1217,16 @@ async function onUpload(filesOrOne: FileList | File) {
             />
 
             <input
-              value={profileNeighbourhood}
-              onChange={(e) => setProfileNeighbourhood(e.target.value.toUpperCase())}
-              placeholder="Neighbourhood (optional)"
+              value={profileGenre}
+              onChange={(e) => setProfileGenre(e.target.value.toUpperCase())}
+              placeholder="Genre (ex: Punk, Metal, Hip-Hop)"
               style={{
                 padding: "10px 12px",
                 borderRadius: 10,
                 border: "1px solid #ccc",
                 textTransform: "uppercase",
               }}
-              title="Optional (ex: Vanier, Centretown, Old Ottawa South)"
+              title="This is your band’s default genre (used when uploading new tracks)"
             />
 
             <textarea
