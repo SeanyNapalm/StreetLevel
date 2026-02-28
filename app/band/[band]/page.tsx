@@ -494,21 +494,22 @@
     }
 
 async function uploadOneTrack(file: File, idx: number, total: number) {
-  if (!bandSlug) {
-    throw new Error("Error: band slug missing. Go to /band/1st-show");
-  }
+  if (!bandSlug) throw new Error("Error: band slug missing. Go to /band/1st-show");
+
+  const uid = await getAuthedUserId();
+  if (!uid) throw new Error("Not logged in.");
 
   const originalName = file?.name ?? "track";
   const safeName = safeFileName(originalName);
 
-  // ✅ unique path to avoid collisions
-  const storagePath = `bands/${bandSlug}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
+  // ✅ include uid so Storage policies usually pass
+  const storagePath = `${uid}/${bandSlug}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
 
   setStatus(`Uploading ${idx}/${total}: ${originalName}`);
 
   const up = await supabase.storage.from("tracks").upload(storagePath, file, {
     upsert: false,
-    contentType: file.type || undefined,
+    contentType: file.type || "audio/mpeg",
   });
   if (up.error) throw up.error;
 
@@ -523,15 +524,12 @@ async function uploadOneTrack(file: File, idx: number, total: number) {
     band_slug: bandSlug,
     title: defaultTitle,
 
-    // ✅ snapshot
     country: cleanCountry,
     province: cleanProvince,
     city: cleanCity,
-    
-
     genre: cleanGenre,
-    is_radio: true,
 
+    is_radio: true,
     file_path: storagePath,
     price_cents: 100,
   });
@@ -539,18 +537,14 @@ async function uploadOneTrack(file: File, idx: number, total: number) {
   if (ins.error) throw ins.error;
 }
 
-// ✅ NEW: batch upload
 async function onUpload(filesOrOne: FileList | File) {
   if (!bandSlug) {
     setStatus("Error: band slug missing. Go to /band/1st-show");
     return;
   }
 
-  // normalize input
   const files: File[] =
-    filesOrOne instanceof File
-      ? [filesOrOne]
-      : Array.from(filesOrOne ?? []).filter(Boolean);
+    filesOrOne instanceof File ? [filesOrOne] : Array.from(filesOrOne ?? []).filter(Boolean);
 
   if (!files.length) return;
 
@@ -572,7 +566,6 @@ async function onUpload(filesOrOne: FileList | File) {
     setUploading(false);
   }
 }
-
 
 
     function startEdit(t: TrackView) {
