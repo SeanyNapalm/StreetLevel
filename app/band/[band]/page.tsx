@@ -542,15 +542,18 @@ async function uploadOneTrack(file: File, idx: number, total: number) {
   if (ins.error) throw ins.error;
 }
 
-async function onUpload(filesOrOne: FileList | File) {
+async function onUpload(filesOrOne: FileList | File | File[]) {
   if (!bandSlug) {
     setStatus("Error: band slug missing. Go to /band/1st-show");
     return;
   }
 
   const files: File[] =
-    filesOrOne instanceof File ? [filesOrOne] : Array.from(filesOrOne ?? []).filter(Boolean);
-
+  Array.isArray(filesOrOne)
+    ? filesOrOne
+    : filesOrOne instanceof File
+      ? [filesOrOne]
+      : Array.from(filesOrOne ?? []).filter(Boolean);
   if (!files.length) return;
 
   setUploading(true);
@@ -1378,6 +1381,7 @@ async function onUpload(filesOrOne: FileList | File) {
             2) TRACKS (SOLO)
           ========================= */}
         <section style={{ marginTop: 14, display: "grid", gap: 10 }}>
+
 {/* Upload header */}
 <div
   style={{
@@ -1394,6 +1398,7 @@ async function onUpload(filesOrOne: FileList | File) {
   }}
 >
   <div style={{ fontWeight: 900, letterSpacing: 1 }}>TRACKS</div>
+
 
   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
     <button
@@ -1419,20 +1424,23 @@ async function onUpload(filesOrOne: FileList | File) {
       {uploading ? "Uploading..." : "Upload audio"}
     </button>
 
-    <input
-      ref={audioInputRef}
-      type="file"
-      accept="audio/*"
-      style={{ display: "none" }}
-      onChange={(e) => {
-        const f = e.target.files?.[0] ?? null;
-        e.currentTarget.value = "";
-        if (!f) return;
+<input
+  ref={audioInputRef}
+  type="file"
+  accept="audio/*"
+  multiple
+  style={{ display: "none" }}
+  onChange={(e) => {
+    // ✅ copy to a normal array FIRST (FileList can get wiped when you clear value)
+    const picked = Array.from(e.currentTarget.files ?? []);
+    e.currentTarget.value = ""; // allow re-picking same files later
 
-        setStatus(`Picked: ${f.name}`);
-        onUpload(f); // ✅ single file
-      }}
-    />
+    if (picked.length === 0) return;
+
+    setStatus(`Picked ${picked.length} file(s)`);
+    onUpload(picked); // ✅ pass array
+  }}
+/>
 
 
   </div>
