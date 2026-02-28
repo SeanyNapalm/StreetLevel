@@ -1,6 +1,9 @@
-  "use client";
+  
 
-  import { use, useEffect, useMemo, useState } from "react";
+
+"use client";
+
+  import { use, useEffect, useMemo, useRef, useState } from "react";
   import { useRouter } from "next/navigation";
   import { supabase } from "../../../lib/supabaseClient";
   import StreetLevelHeader from "../../components/StreetLevelHeader";
@@ -149,6 +152,8 @@
   }
 
   export default function BandDashboard({ params }: { params: Promise<{ band: string }> }) {
+    const audioInputRef = useRef<HTMLInputElement | null>(null);
+    
     const router = useRouter();
     const p = use(params);
     const bandSlug = (p?.band ?? "").trim();
@@ -1373,53 +1378,67 @@ async function onUpload(filesOrOne: FileList | File) {
             2) TRACKS (SOLO)
           ========================= */}
         <section style={{ marginTop: 14, display: "grid", gap: 10 }}>
-          {/* Upload header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 10,
-              background: "white",
-              color: "black",
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "1px solid #eee",
-            }}
-          >
-            <div style={{ fontWeight: 900, letterSpacing: 1 }}>TRACKS</div>
-
-            <label
-              style={{
-                padding: "8px 12px",
-                borderRadius: 10,
-                border: "1px solid #000",
-                cursor: uploading || !bioComplete ? "not-allowed" : "pointer",
-                opacity: uploading || !bioComplete ? 0.35 : 1,
-                fontWeight: 900,
-                background: "black",
-                color: "#2bff00",
-                whiteSpace: "nowrap",
-              }}
-              title={!bioComplete ? "Complete your band bio before uploading songs." : "Upload an audio file"}
-            >
-              Upload audio
-<input
-  type="file"
-  accept="audio/*"
-  multiple
-  disabled={uploading || !bioComplete}
-  style={{ display: "none" }}
-  onChange={(e) => {
-    const fs = e.target.files;
-    e.currentTarget.value = "";
-    if (!fs || fs.length === 0) return;
-    onUpload(fs);
+{/* Upload header */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 10,
+    background: "white",
+    color: "black",
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid #eee",
   }}
-/>
-            </label>
-          </div>
+>
+  <div style={{ fontWeight: 900, letterSpacing: 1 }}>TRACKS</div>
+
+  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+    <button
+      type="button"
+      onClick={() => {
+        if (uploading || !bioComplete) return;
+        audioInputRef.current?.click();
+      }}
+      disabled={uploading || !bioComplete}
+      style={{
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: "1px solid #000",
+        cursor: uploading || !bioComplete ? "not-allowed" : "pointer",
+        opacity: uploading || !bioComplete ? 0.35 : 1,
+        fontWeight: 900,
+        background: "black",
+        color: "#2bff00",
+        whiteSpace: "nowrap",
+      }}
+      title={!bioComplete ? "Complete your band bio before uploading songs." : "Upload an audio file"}
+    >
+      {uploading ? "Uploading..." : "Upload audio"}
+    </button>
+
+    <input
+      ref={audioInputRef}
+      type="file"
+      accept="audio/*"
+      style={{ display: "none" }}
+      onChange={(e) => {
+        const f = e.target.files?.[0] ?? null;
+        e.currentTarget.value = "";
+        if (!f) return;
+
+        setStatus(`Picked: ${f.name}`);
+        onUpload(f); // ✅ single file
+      }}
+    />
+
+    <div style={{ fontSize: 12, opacity: 0.75 }}>
+      bioComplete: <b>{String(bioComplete)}</b> • uploading: <b>{String(uploading)}</b>
+    </div>
+  </div>
+</div>
 
           <div style={{ fontSize: 12, opacity: 0.7 }}>{tracks.length} total</div>
 
