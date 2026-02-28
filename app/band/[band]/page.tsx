@@ -1434,9 +1434,7 @@ async function onUpload(filesOrOne: FileList | File) {
       }}
     />
 
-    <div style={{ fontSize: 12, opacity: 0.75 }}>
-      bioComplete: <b>{String(bioComplete)}</b> • uploading: <b>{String(uploading)}</b>
-    </div>
+
   </div>
 </div>
 
