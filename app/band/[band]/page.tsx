@@ -1409,12 +1409,12 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
       }}
       disabled={uploading || !bioComplete}
       style={{
-        padding: "8px 12px",
+        padding: "12px 14px",
         borderRadius: 10,
         border: "1px solid #000",
         cursor: uploading || !bioComplete ? "not-allowed" : "pointer",
         opacity: uploading || !bioComplete ? 0.35 : 1,
-        fontWeight: 900,
+        fontWeight: 1800,
         background: "black",
         color: "#2bff00",
         whiteSpace: "nowrap",
