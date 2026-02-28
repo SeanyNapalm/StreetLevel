@@ -1,3 +1,5 @@
+
+
   
 
 
@@ -1444,7 +1446,9 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
 
   </div>
-  
+  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+  Tip: You can select multiple songs at once.
+</div>
 </div>
 
           <div style={{ fontSize: 12, opacity: 0.7 }}>{tracks.length} total</div>
