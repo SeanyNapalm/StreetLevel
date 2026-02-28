@@ -1444,6 +1444,7 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
 
   </div>
+  
 </div>
 
           <div style={{ fontSize: 12, opacity: 0.7 }}>{tracks.length} total</div>
