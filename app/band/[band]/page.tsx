@@ -1931,15 +1931,31 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
                         <div style={{ minWidth: 0 }}>
                           
-                        <div style={{ fontWeight: 900 }}>
-                          {formatShowDate(ev.show_date, { weekday: true })}
-                        </div>
+{/* SHOW NAME first (big), then date (smaller) */}
+{ev.note ? (
+  <div
+    style={{
+      fontWeight: 950,
+      fontSize: 16,
+      letterSpacing: 0.6,
+      lineHeight: 1.15,
+      wordBreak: "break-word",
+    }}
+  >
+    {ev.note}
+  </div>
+) : null}
 
-                          {ev.note ? (
-                            <div style={{ fontSize: 12, fontWeight: 950, marginTop: 4, letterSpacing: 0.4 }}>
-                              {ev.note}
-                            </div>
-                          ) : null}
+<div
+  style={{
+    fontSize: 12,
+    opacity: 0.75,
+    marginTop: ev.note ? 4 : 0,
+    fontWeight: 900,
+  }}
+>
+  {formatShowDate(ev.show_date, { weekday: true })}
+</div>
 
                           <div
                             style={{
