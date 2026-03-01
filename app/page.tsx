@@ -1160,7 +1160,7 @@ const calendarMatches = useMemo(() => {
                       display: "inline-block",
                     }}
                   >
-                    Band Login
+                    Log in
                   </Link>
                 </div>
               }
