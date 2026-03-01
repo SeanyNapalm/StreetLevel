@@ -1411,15 +1411,16 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
       }}
       disabled={uploading || !bioComplete}
       style={{
-        padding: "12px 14px",
-        borderRadius: 10,
-        border: "1px solid #000",
-        cursor: uploading || !bioComplete ? "not-allowed" : "pointer",
-        opacity: uploading || !bioComplete ? 0.35 : 1,
-        fontWeight: 1800,
-        background: "black",
-        color: "#2bff00",
-        whiteSpace: "nowrap",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #ccc",
+                    cursor: galleryUploading ? "not-allowed" : "pointer",
+                    fontWeight: 900,
+                    background: "black",
+                    color: "#2bff00",
+                    opacity: galleryUploading ? 0.6 : 1,
+                    width: "fit-content",
+                    flexShrink: 0,
       }}
       title={!bioComplete ? "Complete your band bio before uploading songs." : "Upload an audio file"}
     >
