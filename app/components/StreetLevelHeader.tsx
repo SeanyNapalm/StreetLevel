@@ -71,7 +71,6 @@ export default function StreetLevelHeader({
                 borderRadius: 14,
                 maxWidth: "80vw",
                 height: "auto",
-                boxShadow: "0 0 0 1px rgba(0,0,0,0.06)",
                 transition: "transform 120ms ease, box-shadow 120ms ease",
               }}
             />
@@ -194,25 +193,42 @@ export default function StreetLevelHeader({
                 <div>• Events can launch instant playlists of those bands only!</div>
               </div>
 
-              <div
-                style={{
-                  border: "1px solid rgba(0,0,0,0.08)",
-                  borderRadius: 14,
-                  padding: 12,
-                  background: "rgba(0,0,0,0.02)",
-                  display: "grid",
-                  gap: 6,
-                  fontSize: 14,
-                }}
-              >
-                <div style={{ fontWeight: 900 }}>Contact</div>
-                <div>
-                  Email:{" "}
-                  <a href={`mailto:${contactEmail}`} style={{ fontWeight: 800 }}>
-                    {contactEmail}
-                  </a>
-                </div>
-              </div>
+<div
+  style={{
+    border: "1px solid rgba(0,0,0,0.08)",
+    borderRadius: 14,
+    padding: 12,
+    background: "rgba(0,0,0,0.02)",
+    display: "grid",
+    gap: 8,
+    fontSize: 14,
+  }}
+>
+  <div style={{ fontWeight: 900 }}>Contact</div>
+
+  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+    <Image
+      src="/seanynapalm.jpg"
+      alt="StreetLevel crew"
+      width={63}
+      height={63}
+      style={{
+        borderRadius: 12,
+        objectFit: "cover",
+        boxShadow: "0 0 0 1px rgba(0,0,0,0.10)",
+        flexShrink: 0,
+      }}
+    />
+
+    <div style={{ lineHeight: 1.2 }}>
+      <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>EMAIL</div>
+      <a href={`mailto:${contactEmail}`} style={{ fontWeight: 900, color: "black" }}>
+        {contactEmail}
+      </a>
+    </div>
+  </div>
+</div>
+
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 <a
@@ -246,9 +262,7 @@ export default function StreetLevelHeader({
                 </button>
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.65 }}>
-                Tip: press <strong>Esc</strong> to close.
-              </div>
+
             </div>
           </div>
         </div>
