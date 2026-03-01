@@ -198,20 +198,27 @@
     const [profileBio, setProfileBio] = useState("");
     const [avatarPath, setAvatarPath] = useState<string | null>(null);
 
-    const bioComplete = useMemo(() => {
-      const nameOk = (profileName ?? "").trim().length >= 2;
+const uploadProfileComplete = useMemo(() => {
+  const nameOk = (profileName ?? "").trim().length >= 2;
 
-      const countryOk = (profileCountry ?? "").trim().length >= 2;
-      const provinceOk = (profileProvince ?? "").trim().length >= 2;
-      const cityOk = (profileCity ?? "").trim().length >= 2;
+  const countryOk = (profileCountry ?? "").trim().length >= 2;
+  const provinceOk = (profileProvince ?? "").trim().length >= 2;
+  const cityOk = (profileCity ?? "").trim().length >= 2;
 
-      const genreOk = (profileGenre ?? "").trim().length >= 2;
+  const genreOk = (profileGenre ?? "").trim().length >= 2;
 
-      const bioOk = (profileBio ?? "").trim().length >= 10;
+  // ✅ Bio is NOT required for uploading
+  return nameOk && countryOk && provinceOk && cityOk && genreOk;
+}, [profileName, profileCountry, profileProvince, profileCity, profileGenre]);
 
-      return nameOk && countryOk && provinceOk && cityOk && genreOk && bioOk;
-    }, [profileName, profileCountry, profileProvince, profileCity, profileGenre, profileBio]);
+const bioRecommendedComplete = useMemo(() => {
+  return (profileBio ?? "").trim().length >= 10;
+}, [profileBio]);
 
+const uploadGateMsg = useMemo(() => {
+  if (uploadProfileComplete) return "";
+  return "To upload songs, fill: Name, Country, Province/State, City, Genre — then click “Save bio”.";
+}, [uploadProfileComplete]);
 
     // --- NEXT SHOW (events MVP) ---
     const [showDate, setShowDate] = useState<string>("");
@@ -1403,29 +1410,36 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
 
   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-    <button
-      type="button"
-      onClick={() => {
-        if (uploading || !bioComplete) return;
-        audioInputRef.current?.click();
-      }}
-      disabled={uploading || !bioComplete}
-      style={{
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #ccc",
-                    cursor: galleryUploading ? "not-allowed" : "pointer",
-                    fontWeight: 900,
-                    background: "black",
-                    color: "#2bff00",
-                    opacity: galleryUploading ? 0.6 : 1,
-                    width: "fit-content",
-                    flexShrink: 0,
-      }}
-      title={!bioComplete ? "Complete your band bio before uploading songs." : "Upload an audio file"}
-    >
-      {uploading ? "Uploading..." : "Upload audio"}
-    </button>
+<button
+  type="button"
+  onClick={() => {
+    if (uploading) return;
+
+    if (!uploadProfileComplete) {
+      setStatus(uploadGateMsg);
+      alert(uploadGateMsg); // ✅ impossible to miss (great for Android + iPhone)
+      return;
+    }
+
+    audioInputRef.current?.click();
+  }}
+  disabled={uploading || !uploadProfileComplete}
+  style={{
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #ccc",
+    cursor: uploading || !uploadProfileComplete ? "not-allowed" : "pointer",
+    fontWeight: 900,
+    background: "black",
+    color: "#2bff00",
+    opacity: uploading || !uploadProfileComplete ? 0.6 : 1,
+    width: "fit-content",
+    flexShrink: 0,
+  }}
+  title={!uploadProfileComplete ? uploadGateMsg : "Upload audio (multi-select supported)"}
+>
+  {uploading ? "Uploading..." : "Upload audio"}
+</button>
 
 <input
   ref={audioInputRef}
@@ -1447,6 +1461,16 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
 
   </div>
+
+  {!uploadProfileComplete ? (
+  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>
+    {uploadGateMsg}
+  </div>
+) : !bioRecommendedComplete ? (
+  <div style={{ fontSize: 12, opacity: 0.6 }}>
+    Bio is optional, but recommended (10+ chars) so fans know what you’re about.
+  </div>
+) : null}
   
 </div>
 
