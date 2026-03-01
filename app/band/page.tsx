@@ -325,7 +325,7 @@ export default function BandLoginPage() {
                 <input
                   value={bandName}
                   onChange={(e) => setBandName(e.target.value)}
-                  placeholder='Band name, or if you are not in a band, user name'
+                  placeholder='Band name, or user name'
                   style={{
                     padding: "12px 14px",
                     borderRadius: 12,
