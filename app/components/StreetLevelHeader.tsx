@@ -150,19 +150,26 @@ export default function StreetLevelHeader({
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                padding: "14px 16px",
-                borderBottom: "1px solid rgba(0,0,0,0.08)",
-              }}
-            >
-              <div style={{ fontWeight: 950, letterSpacing: 0.6 }}>
-                About Street Level
-              </div>
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "16px 16px",
+    borderBottom: "1px solid rgba(0,0,0,0.08)",
+  }}
+>
+  <div
+    style={{
+      alignItems: "center",
+      fontWeight: 950,
+      letterSpacing: 0.8,
+      fontSize: 18,
+    }}
+  >
+    About Street Level
+  </div>
 
               <button
                 type="button"
@@ -210,8 +217,8 @@ export default function StreetLevelHeader({
     <Image
       src="/seanynapalm.jpg"
       alt="StreetLevel crew"
-      width={63}
-      height={63}
+      width={99}
+      height={99}
       style={{
         borderRadius: 12,
         objectFit: "cover",
@@ -231,20 +238,7 @@ export default function StreetLevelHeader({
 
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                <a
-                  href="/"
-                  style={{
-                    textDecoration: "none",
-                    border: "1px solid rgba(0,0,0,0.14)",
-                    borderRadius: 999,
-                    padding: "10px 14px",
-                    fontWeight: 900,
-                    color: "black",
-                    background: "white",
-                  }}
-                >
-                  Back to Radio
-                </a>
+
 
                 <button
                   type="button"
