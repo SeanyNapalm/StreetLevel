@@ -1140,7 +1140,7 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
                 {avatarUploading ? "Uploading..." : "Upload pic"}
                 <input
                   type="file"
-                  accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg"
+                  accept="image/png,image/jpeg,image/webp"
                   disabled={avatarUploading}
                   style={{ display: "none" }}
                   onChange={(e) => {
