@@ -225,11 +225,11 @@ export default function BandLoginPage() {
         left={
           <div style={{ display: "grid", gap: 6 }}>
 
-            <div style={{ fontSize: 34, fontWeight: 950, lineHeight: 1.05 }}>Band login</div>
+            <div style={{ fontSize: 34, fontWeight: 950, lineHeight: 1.05 }}>Band/User login</div>
             <div style={{ opacity: 0.75 }}>
               {userEmail
                 ? "Signed in — redirecting to your dashboard.."
-                : "Sign in to access your band dashboard."}
+                : "Sign in to access your dashboard."}
             </div>
           </div>
         }
