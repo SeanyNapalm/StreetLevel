@@ -237,24 +237,7 @@ export default function StreetLevelHeader({
 </div>
 
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
 
-
-                <button
-                  type="button"
-                  onClick={() => setAboutOpen(false)}
-                  style={{
-                    border: "1px solid rgba(0,0,0,0.14)",
-                    borderRadius: 999,
-                    padding: "10px 14px",
-                    fontWeight: 900,
-                    cursor: "pointer",
-                    background: "white",
-                  }}
-                >
-                  Close
-                </button>
-              </div>
 
 
             </div>
