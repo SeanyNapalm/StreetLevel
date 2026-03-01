@@ -1430,7 +1430,7 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 <input
   ref={audioInputRef}
   type="file"
-  accept="audio/*"
+  accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus"
   multiple
   style={{ display: "none" }}
   onChange={(e) => {
