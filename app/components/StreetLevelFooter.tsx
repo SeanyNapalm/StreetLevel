@@ -1,12 +1,5 @@
 import Image from "next/image";
 
-type Props = {
-  email?: string;          // show + mailto link
-  smsNumber?: string;      // used ONLY for sms: link (not displayed)
-  avatarSrc?: string;      // default: /seanynapalm.jpg
-  textIconSrc?: string;    // default: /textme.jpg
-};
-
 function toSmsHref(num: string) {
   const cleaned = (num || "").replace(/[^\d+]/g, "");
   const normalized =
@@ -14,16 +7,11 @@ function toSmsHref(num: string) {
   return `sms:${normalized}`;
 }
 
-export default function StreetLevelFooter({
-  email = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
-  smsNumber = process.env.NEXT_PUBLIC_CONTACT_SMS || "",
-  avatarSrc = "/seanynapalm.jpg",
-  textIconSrc = "/textme.jpg",
-}: Props) {
+export default function StreetLevelFooter() {
   const year = new Date().getFullYear();
 
-  const hasEmail = !!email.trim();
-  const hasSms = !!smsNumber.trim();
+  const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "admin@streetlevel.live";
+  const smsNumber = process.env.NEXT_PUBLIC_CONTACT_SMS || "6137999532";
 
   return (
     <footer
@@ -42,111 +30,49 @@ export default function StreetLevelFooter({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 14,
-          flexWrap: "wrap",          // ✅ wraps on small screens
+          gap: 12,
+          flexWrap: "wrap",
         }}
       >
         {/* Pic */}
         <div
           style={{
-            width: 42,
-            height: 42,
+            width: 69,
+            height: 69,
             borderRadius: 999,
             overflow: "hidden",
             border: "1px solid #eee",
-            background: "#f6f6f6",
-            flex: "0 0 auto",
           }}
-          title="Seany Napalm"
         >
           <Image
-            src={avatarSrc}
+            src="/seanynapalm.jpg"
             alt="Seany Napalm"
-            width={42}
-            height={42}
+            width={38}
+            height={38}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         </div>
 
-        {/* Blurb */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: 10,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          <span style={{ fontWeight: 950, letterSpacing: 0.4 }}>Need help?</span>
-          <span style={{ fontSize: 13, opacity: 0.75 }}>
-            Contact me if you hit any issues or need something fixed.
-          </span>
-        </div>
-
-        {/* Email */}
-        {hasEmail ? (
+        {/* Inline Contact Line */}
+        <div style={{ fontSize: 14 }}>
+        <span style={{ fontWeight: 950 }}>
+            Need any Help?:
+        </span>{" "}
           <a
             href={`mailto:${email}`}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 12,
-              border: "1px solid #ddd",
-              textDecoration: "none",
-              fontWeight: 900,
-              background: "black",
-              color: "white",
-              display: "inline-block",
-              whiteSpace: "nowrap",
-            }}
-            title="Email me"
+            style={{ fontWeight: 900, textDecoration: "underline", color: "black" }}
           >
-            Email: {email}
-          </a>
-        ) : null}
-
-        {/* Text me */}
-        {hasSms ? (
+            Email me
+          </a>{" "}
+          or{" "}
           <a
             href={toSmsHref(smsNumber)}
-            aria-label="Text me"
-            title="Text me"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 10px",
-              borderRadius: 12,
-              border: "1px solid #ddd",
-              textDecoration: "none",
-              fontWeight: 900,
-              background: "white",
-              color: "black",
-              whiteSpace: "nowrap",
-            }}
+            style={{ fontWeight: 900, textDecoration: "underline", color: "black" }}
           >
             Text me
-            <span
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 8,
-                overflow: "hidden",
-                border: "1px solid #eee",
-                background: "#fff",
-                display: "inline-block",
-              }}
-            >
-              <Image
-                src={textIconSrc}
-                alt=""
-                width={24}
-                height={24}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            </span>
-          </a>
-        ) : null}
+          </a>{" "}
+          if you have any issues!
+        </div>
 
         {/* Copyright */}
         <div style={{ fontSize: 12, opacity: 0.55, whiteSpace: "nowrap" }}>
@@ -156,4 +82,3 @@ export default function StreetLevelFooter({
     </footer>
   );
 }
-

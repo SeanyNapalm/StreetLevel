@@ -215,7 +215,7 @@ export default function StreetLevelHeader({
 
   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
     <Image
-      src="/seanynapalm.jpg"
+      src="/Kim-N-A-Sean.jpg"
       alt="StreetLevel crew"
       width={99}
       height={99}
