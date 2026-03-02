@@ -1322,7 +1322,7 @@ function QueueRow({ t }: { t: TrackView }) {
           position: "absolute",
           inset: 0,
           borderRadius: 14,
-          background: "rgba(255,0,0,0.10)",
+          background: "rgba(35, 35, 35, 0.1)",
           border: "1px solid rgba(255,0,0,0.25)",
           display: "flex",
           alignItems: "center",
