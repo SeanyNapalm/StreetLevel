@@ -37,8 +37,8 @@ export default function StreetLevelFooter() {
         {/* Pic */}
         <div
           style={{
-            width: 69,
-            height: 69,
+            width: 49,
+            height: 49,
             borderRadius: 999,
             overflow: "hidden",
             border: "1px solid #eee",
@@ -55,9 +55,6 @@ export default function StreetLevelFooter() {
 
         {/* Inline Contact Line */}
         <div style={{ fontSize: 14 }}>
-        <span style={{ fontWeight: 950 }}>
-            Need any Help?:
-        </span>{" "}
           <a
             href={`mailto:${email}`}
             style={{ fontWeight: 900, textDecoration: "underline", color: "black" }}
