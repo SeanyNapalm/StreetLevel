@@ -1,5 +1,7 @@
 "use client";
 
+import StreetLevelFooter from "../components/StreetLevelFooter";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -418,6 +420,7 @@ export default function BandLoginPage() {
 
         {status ? <div style={{ marginTop: 12, opacity: 0.85 }}>{status}</div> : null}
       </div>
+      <StreetLevelFooter />
     </main>
   );
 }

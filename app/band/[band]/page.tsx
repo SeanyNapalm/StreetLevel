@@ -5,6 +5,8 @@
 
 "use client";
 
+  import StreetLevelFooter from "../../components/StreetLevelFooter";
+
   import { use, useEffect, useMemo, useRef, useState } from "react";
   import { useRouter } from "next/navigation";
   import { supabase } from "../../../lib/supabaseClient";
@@ -2230,6 +2232,7 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
             </div>
           </div>
         ) : null}
+        <StreetLevelFooter />
       </main>
     );
   }
