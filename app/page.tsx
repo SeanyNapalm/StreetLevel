@@ -1105,6 +1105,8 @@ export default function HomePage() {
   // Queue Row (Swipe-to-remove)
   // ============================
 function QueueRow({ t }: { t: TrackView }) {
+const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
+  
   const SWIPE_OPEN_AT = 70;     // how far left to snap open
   const SWIPE_DELETE_AT = 145;  // how far left to auto-delete (optional)
   const OPEN_X = -120;          // parked position when open (reveals button)
