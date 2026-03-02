@@ -1658,7 +1658,7 @@ function QueueRow({ t }: { t: TrackView }) {
                               color: "black",
                               cursor: "pointer",
                             }}
-                            title="Never play this song again"
+                            title={`Never play ${nowPlaying.band_slug || "this band"} — ${nowPlaying.title || "this song"} again`}
                           >
                             Ban 🚫
                           </button>
@@ -1767,10 +1767,19 @@ function QueueRow({ t }: { t: TrackView }) {
               <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
                 {nowPlaying?.title ?? "—"}
               </div>
+              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
+                {nowPlaying?.band_slug ?? "—"}
+              </div>
+
             </div>
 
             <div style={{ padding: 14, display: "grid", gap: 10 }}>
               {banError ? <div style={{ fontSize: 12, color: "#ffb3b3" }}>Error: {banError}</div> : null}
+
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                This ban is saved to your account and applies to future radio sessions. it can be undone by visiting that bands page, and clicking to UNDO BAN the song
+              </div>
+
 
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
                 <button
@@ -1779,9 +1788,9 @@ function QueueRow({ t }: { t: TrackView }) {
                   style={{
                     padding: "10px 12px",
                     borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    background: "transparent",
-                    color: "white",
+                    border: "1px solid #2bff002d",
+                    background: "rgba(255, 255, 255, 0.1)",
+                    color: "#2bff00",
                     fontWeight: 900,
                     cursor: banWorking ? "not-allowed" : "pointer",
                     opacity: banWorking ? 0.6 : 1,
@@ -1796,9 +1805,9 @@ function QueueRow({ t }: { t: TrackView }) {
                   style={{
                     padding: "10px 12px",
                     borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    background: "white",
-                    color: "black",
+                    border: "1px solid #ff0d002e",
+                    background: "rgba(255, 255, 255, 0.1)",
+                    color: "#ff0d00",
                     fontWeight: 950,
                     cursor: banWorking ? "not-allowed" : "pointer",
                     opacity: banWorking ? 0.75 : 1,
@@ -1809,9 +1818,7 @@ function QueueRow({ t }: { t: TrackView }) {
                 </button>
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                This ban is saved to your account and applies to future radio sessions.
-              </div>
+
             </div>
           </div>
         </div>
