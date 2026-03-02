@@ -1930,31 +1930,17 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
                         )}
 
                         <div style={{ minWidth: 0 }}>
-                          
-{/* SHOW NAME first (big), then date (smaller) */}
-{ev.note ? (
-  <div
-    style={{
-      fontWeight: 950,
-      fontSize: 16,
-      letterSpacing: 0.6,
-      lineHeight: 1.15,
-      wordBreak: "break-word",
-    }}
-  >
-    {ev.note}
-  </div>
-) : null}
-
 <div
   style={{
-    fontSize: 12,
-    opacity: 0.75,
-    marginTop: ev.note ? 4 : 0,
-    fontWeight: 900,
+    fontWeight: 950,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    lineHeight: 1.15,
   }}
+  title={`${formatShowDate(ev.show_date, { weekday: true })} — ${normSpaces(ev.note || "") || "(Unnamed event)"}`}
 >
-  {formatShowDate(ev.show_date, { weekday: true })}
+  {formatShowDate(ev.show_date, { weekday: true })} — {normSpaces(ev.note || "") || "(Unnamed event)"}
 </div>
 
                           <div
