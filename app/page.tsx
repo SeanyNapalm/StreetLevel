@@ -1105,12 +1105,12 @@ export default function HomePage() {
   // Queue Row (Swipe-to-remove)
   // ============================
 function QueueRow({ t }: { t: TrackView }) {
-const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
-  
-  const SWIPE_OPEN_AT = 70;     // how far left to snap open
-  const SWIPE_DELETE_AT = 145;  // how far left to auto-delete (optional)
-  const OPEN_X = -120;          // parked position when open (reveals button)
-  const TAP_SLOP = 8;           // px: movement under this is treated like a click
+  const swipeEnabled = isNarrow; // ✅ swipe only on mobile/narrow screens
+
+  const SWIPE_OPEN_AT = 70;
+  const SWIPE_DELETE_AT = 145;
+  const OPEN_X = -120;
+  const TAP_SLOP = 8;
 
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
@@ -1132,18 +1132,20 @@ const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
   }
 
   function onPointerDown(e: React.PointerEvent) {
+    if (!swipeEnabled) return;
+
     startX.current = e.clientX;
     startY.current = e.clientY;
     dragging.current = true;
     moved.current = false;
     pointerIdRef.current = e.pointerId;
 
-    // capture so we keep getting move events during drag
     (e.currentTarget as any).setPointerCapture?.(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent) {
-    // ✅ if not actively dragging, do not move (prevents "following mouse")
+    if (!swipeEnabled) return;
+
     if (!dragging.current) return;
     if (startX.current == null || startY.current == null) return;
 
@@ -1152,10 +1154,8 @@ const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
 
     if (Math.abs(deltaX) > TAP_SLOP || Math.abs(deltaY) > TAP_SLOP) moved.current = true;
 
-    // If the gesture is more vertical than horizontal, treat as scrolling
     if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) return;
 
-    // left swipe only. If row is open, start from OPEN_X.
     const base = open ? OPEN_X : 0;
     const next = base + deltaX;
 
@@ -1164,9 +1164,10 @@ const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
   }
 
   function onPointerUp(e: React.PointerEvent) {
+    if (!swipeEnabled) return;
+
     dragging.current = false;
 
-    // ✅ release capture so it truly stops tracking
     const pid = pointerIdRef.current;
     if (pid != null) {
       try {
@@ -1175,26 +1176,139 @@ const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
     }
     pointerIdRef.current = null;
 
-    // If the user was basically clicking (no real movement), don't force open/close.
     if (!moved.current) {
-      // If already open, a plain click closes it (nice UX)
       if (open) closeRow();
       return;
     }
 
-    // Hard yank -> delete
     if (dx <= -SWIPE_DELETE_AT) {
       removeFromQueue(t.id);
       return;
     }
 
-    // snap open / close
     if (dx <= -SWIPE_OPEN_AT) openRow();
     else closeRow();
   }
 
   const thumb = eventMode ? (t.flyerUrl || t.artUrl) : t.artUrl;
 
+  // ✅ Desktop: no swipe, simple buttons
+  if (!swipeEnabled) {
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "44px 1fr auto auto",
+          gap: 10,
+          alignItems: "center",
+          border: "1px solid #eee",
+          borderRadius: 14,
+          padding: "10px 12px",
+          background: "white",
+        }}
+      >
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumb}
+            alt=""
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              objectFit: "cover",
+              border: "1px solid #eee",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              border: "1px solid #eee",
+              opacity: 0.25,
+            }}
+          />
+        )}
+
+        {/* ✅ band link preserved */}
+        <Link
+          href={`/b/${t.band_slug}`}
+          style={{
+            textDecoration: "none",
+            color: "inherit",
+            minWidth: 0,
+            display: "block",
+          }}
+          title={`Open ${t.band_slug}`}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 950,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {t.title}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                opacity: 0.75,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {t.city} • {t.genre} • {t.band_slug}
+            </div>
+          </div>
+        </Link>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            playTrack(t);
+          }}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 12,
+            border: "1px solid #ddd",
+            fontWeight: 900,
+            background: "black",
+            color: "#2bff00",
+          }}
+        >
+          Play
+        </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            removeFromQueue(t.id);
+          }}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            border: "1px solid #ddd",
+            fontWeight: 950,
+            background: "black",
+            color: "white",
+            cursor: "pointer",
+          }}
+          title="Remove from queue"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  // ✅ Mobile: swipe-to-reveal remove
   return (
     <div
       style={{
@@ -1203,7 +1317,6 @@ const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
         overflow: "hidden",
       }}
     >
-      {/* ✅ BACKGROUND ACTION AREA (clickable) */}
       <div
         style={{
           position: "absolute",
@@ -1235,14 +1348,12 @@ const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
         </button>
       </div>
 
-      {/* ✅ FOREGROUND CARD */}
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         style={{
           transform: `translateX(${open ? OPEN_X : dx}px)`,
-          // ✅ once open, always stick to OPEN_X (unless actively dragging)
           transition: dragging.current ? "none" : "transform 160ms ease",
           touchAction: "pan-y",
           display: "grid",
@@ -1280,14 +1391,12 @@ const swipeEnabled = isNarrow; // swipe only on mobile/narrow screens
           />
         )}
 
-        {/* ✅ Make the song title area a link to band page */}
         <Link
           href={`/b/${t.band_slug}`}
           onClick={(e) => {
-            // If row is open, close it but still allow navigation
-            // Also prevent the swipe container from treating this as a close-click.
-            e.stopPropagation();
+            // If they tap the link while open, close first
             if (open) closeRow();
+            e.stopPropagation();
           }}
           style={{
             textDecoration: "none",
