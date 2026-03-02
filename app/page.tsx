@@ -9,11 +9,9 @@ import { supabase } from "../lib/supabaseClient";
 import StreetLevelHeader from "./components/StreetLevelHeader";
 import { formatShowDate } from "../lib/date";
 
-
 type EventRow = {
   id: string;
 
-  // ✅ NEW (events table now stores these)
   country: string | null;
   province: string | null;
 
@@ -30,12 +28,10 @@ type TrackRow = {
   id: string;
   title: string;
 
-  // ✅ location snapshot copied from profile at upload time
   country: string | null;
   province: string | null;
 
   city: string;
-
   genre: string;
   is_radio: boolean;
   band_slug: string;
@@ -131,7 +127,6 @@ function localTodayISO() {
 // =========================
 // Hardcoded location lists (seed)
 // Start with Canada only.
-// You can expand this later.
 // =========================
 const COUNTRY_OPTIONS = ["Canada"] as const;
 
@@ -169,22 +164,21 @@ const CITIES_BY_PROVINCE: Record<string, string[]> = {
   "Northwest Territories": ["Yellowknife"],
 };
 
-
 type WhereStep = "country" | "province" | "city";
 
 export default function HomePage() {
   const [status, setStatus] = useState("");
 
   // WHO
-  const [q, setQ] = useState(""); // band name or song title search
+  const [q, setQ] = useState("");
 
-  // EVENT SEARCH (exact show name stored in events.note)
+  // EVENT SEARCH
   const [eventShowName, setEventShowName] = useState("");
 
   // WHAT
   const [genre, setGenre] = useState("");
 
-  // WHERE (progressive)
+  // WHERE
   const [country, setCountry] = useState("");
   const [province, setProvince] = useState("");
   const [city, setCity] = useState("");
@@ -192,7 +186,7 @@ export default function HomePage() {
   const [whereStep, setWhereStep] = useState<WhereStep>("country");
 
   // event / offline
-  const [date, setDate] = useState(""); // YYYY-MM-DD (event date)
+  const [date, setDate] = useState("");
   const [offlineMode, setOfflineMode] = useState(false);
 
   const [eventMode, setEventMode] = useState(false);
@@ -202,29 +196,29 @@ export default function HomePage() {
   const [tracks, setTracks] = useState<TrackView[]>([]);
   const [pendingFreshRound, setPendingFreshRound] = useState(false);
 
-  // ✅ Calendar modal state
+  // ✅ Calendar modal
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarError, setCalendarError] = useState("");
   const [calendarEvents, setCalendarEvents] = useState<EventRow[]>([]);
 
-  // ✅ keep a stable list of genres we've seen so the dropdown never "shrinks"
+  // ✅ stable genres
   const [masterGenres, setMasterGenres] = useState<string[]>([]);
 
   // Playback
   const [queue, setQueue] = useState<TrackView[]>([]);
   const [nowPlaying, setNowPlaying] = useState<TrackView | null>(null);
 
-  // Autoplay handling
+  // Autoplay
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const autoStartAfterEventPickRef = useRef(false);
 
-  // UI: overlay / hero
+  // UI
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
 
-  // ✅ Splash screen (one-time per session)
+  // Splash
   const [splashPhase, setSplashPhase] = useState<"off" | "show" | "fade">("show");
 
   // mobile detection (simple)
@@ -236,7 +230,117 @@ export default function HomePage() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // ✅ pull filters from URL (share links)
+  // ==========================
+  // ✅ BANS (user-specific)
+  // ==========================
+  const [banIds, setBanIds] = useState<Set<string>>(new Set());
+  const banIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    banIdsRef.current = banIds;
+  }, [banIds]);
+
+  async function refreshBans() {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const user = auth?.user;
+      if (!user) {
+        setBanIds(new Set());
+        return;
+      }
+
+      // Table: user_banned_tracks (user_id, track_id)
+      const { data, error } = await supabase
+        .from("user_banned_tracks")
+        .select("track_id")
+        .eq("user_id", user.id);
+
+      if (error) {
+        // don't break radio if bans table isn't ready yet
+        console.warn("ban load error:", error.message);
+        return;
+      }
+
+      const s = new Set<string>((data ?? []).map((r: any) => String(r.track_id)));
+      setBanIds(s);
+    } catch (e) {
+      console.warn("refreshBans failed:", e);
+    }
+  }
+
+  useEffect(() => {
+    // load bans once on mount, and whenever auth state changes
+    refreshBans();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      refreshBans();
+    });
+    return () => {
+      sub?.subscription?.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ✅ Ban confirm modal state
+  const [banConfirmOpen, setBanConfirmOpen] = useState(false);
+  const [banWorking, setBanWorking] = useState(false);
+  const [banError, setBanError] = useState("");
+
+  function requestBanNowPlaying() {
+    setBanError("");
+    if (!nowPlaying) return;
+    setBanConfirmOpen(true);
+  }
+
+  async function confirmBanNowPlaying() {
+    setBanError("");
+    const t = nowPlaying;
+    if (!t) return;
+
+    const { data: auth } = await supabase.auth.getUser();
+    const user = auth?.user;
+
+    if (!user) {
+      setBanConfirmOpen(false);
+      setStatus("Log in to ban songs (bans are saved per user).");
+      return;
+    }
+
+    setBanWorking(true);
+    try {
+      const { error } = await supabase.from("user_banned_tracks").insert({
+        user_id: user.id,
+        track_id: t.id,
+      });
+
+      // Unique constraint might throw duplicate; treat as success
+      if (error && !/duplicate|unique/i.test(error.message)) {
+        setBanError(error.message);
+        setBanWorking(false);
+        return;
+      }
+
+      // update local ban set immediately
+      setBanIds((prev) => {
+        const next = new Set(prev);
+        next.add(t.id);
+        return next;
+      });
+
+      // remove from current session queue
+      setQueue((q0) => q0.filter((x) => x.id !== t.id));
+
+      // close modal
+      setBanConfirmOpen(false);
+      setBanWorking(false);
+
+      // skip to next
+      go();
+    } catch (e: any) {
+      setBanError(e?.message ?? "Ban failed.");
+      setBanWorking(false);
+    }
+  }
+
+  // ✅ pull filters from URL
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -245,7 +349,6 @@ export default function HomePage() {
     const co = url.searchParams.get("country") ?? "";
     const pr = url.searchParams.get("province") ?? "";
     const ci = url.searchParams.get("city") ?? "";
- 
 
     const g = url.searchParams.get("genre") ?? "";
     const d = url.searchParams.get("date") ?? "";
@@ -256,7 +359,6 @@ export default function HomePage() {
     if (co) setCountry(co);
     if (pr) setProvince(pr);
     if (ci) setCity(ci);
-   
 
     if (g) setGenre(g);
     if (d) setDate(d);
@@ -265,12 +367,10 @@ export default function HomePage() {
 
     if (off === "1" || off.toLowerCase() === "true") setOfflineMode(true);
 
-    // set whereStep based on deepest param
-     if (ci) setWhereStep("city");
+    if (ci) setWhereStep("city");
     else if (pr) setWhereStep("province");
     else setWhereStep("country");
 
-    // If any filters exist, don't force the hero overlay forever
     const any = Boolean(co || pr || ci || g || d || qq || evn || off);
     if (any) {
       setFiltersOpen(false);
@@ -279,68 +379,58 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-// ✅ After first load (and after the splash), render the radio UI behind the filters
-useEffect(() => {
-  if (typeof window === "undefined") return;
+  // ✅ After first load (and after the splash), render UI behind filters
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (splashPhase !== "off") return;
 
-  // wait until splash is gone so it still feels clean
-  if (splashPhase !== "off") return;
+    setHasStarted(true);
 
-  // show the radio layout behind the modal, but don't autoplay
-  setHasStarted(true);
-
-  // make sure we don't accidentally have something playing
-  setNowPlaying(null);
-  setAutoplayBlocked(false);
-  if (audioRef.current) {
-    audioRef.current.pause();
-    audioRef.current.currentTime = 0;
-  }
-
-  // NOTE: We are NOT calling go() here.
-}, [splashPhase]);
-
-
+    setNowPlaying(null);
+    setAutoplayBlocked(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [splashPhase]);
 
   // ✅ One-time splash (per session)
-useEffect(() => {
-  if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const KEY = "sl_splash_seen_v1";
-  const already = sessionStorage.getItem(KEY);
+    const KEY = "sl_splash_seen_v1";
+    const already = sessionStorage.getItem(KEY);
 
-  // ✅ If already seen, kill splash immediately (prevents any weird fade)
-  if (already) {
-    setSplashPhase("off");
-    return;
-  }
+    if (already) {
+      setSplashPhase("off");
+      return;
+    }
 
-  sessionStorage.setItem(KEY, "1");
+    sessionStorage.setItem(KEY, "1");
 
-  const SHOW_MS = 1200;
-  const FADE_MS = 3300;
+    const SHOW_MS = 1200;
+    const FADE_MS = 3300;
 
-  setSplashPhase("show");
+    setSplashPhase("show");
 
-  const t1 = window.setTimeout(() => setSplashPhase("fade"), SHOW_MS);
-  const t2 = window.setTimeout(() => setSplashPhase("off"), SHOW_MS + FADE_MS + 50);
+    const t1 = window.setTimeout(() => setSplashPhase("fade"), SHOW_MS);
+    const t2 = window.setTimeout(() => setSplashPhase("off"), SHOW_MS + FADE_MS + 50);
 
-  return () => {
-    window.clearTimeout(t1);
-    window.clearTimeout(t2);
-  };
-}, []);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
 
-  // ✅ Filter panel sizing (single source of truth)
-  const FILTER_PANEL_MAX = 560; // overall modal width cap (shrink this to taste)
-  const FILTER_FIELD_MAX = 430; // max width for “main” inputs/selects inside
-  const FILTER_GO_MAX = FILTER_FIELD_MAX; // make GO button match field width
+  // ✅ Filter panel sizing
+  const FILTER_PANEL_MAX = 560;
+  const FILTER_FIELD_MAX = 430;
+  const FILTER_GO_MAX = FILTER_FIELD_MAX;
 
   function clearLocation() {
     setCountry("");
     setProvince("");
     setCity("");
-  
     setWhereStep("country");
   }
 
@@ -348,23 +438,19 @@ useEffect(() => {
     const showName = normSpaces(ev.note ?? "").toUpperCase();
     if (showName) {
       setEventShowName(showName);
-      setDate(""); // use show-name mode
+      setDate("");
     } else {
-      // fallback to date mode if note is missing
       setEventShowName("");
       setDate((ev.show_date ?? "").slice(0, 10));
     }
 
-    // ✅ Apply event’s stored location/genre (if present)
     if (ev.country) setCountry(toTitleCaseSmart(ev.country));
     if (ev.province) setProvince(toTitleCaseSmart(ev.province));
     if (ev.city) setCity(toTitleCaseSmart(ev.city));
     if (ev.genre) setGenre(toTitleCaseSmart(ev.genre));
 
-    // ✅ Optional: clear band/song search so event mode feels clean
     setQ("");
 
-    // ✅ Ensure the progressive WHERE UI is at the deepest available level
     if (ev.city) setWhereStep("city");
     else if (ev.province) setWhereStep("city");
     else if (ev.country) setWhereStep("province");
@@ -377,7 +463,7 @@ useEffect(() => {
     autoStartAfterEventPickRef.current = true;
   }
 
-  // keep URL in sync (nice for sharing)
+  // keep URL in sync
   function syncUrl() {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
@@ -391,7 +477,6 @@ useEffect(() => {
     setOrDel("province", province);
     setOrDel("city", city);
 
-
     setOrDel("genre", genre);
     setOrDel("date", date);
     setOrDel("q", q);
@@ -403,7 +488,7 @@ useEffect(() => {
     window.history.replaceState({}, "", url.toString());
   }
 
-  // ✅ Load calendar events once (upcoming filtering happens client-side)
+  // ✅ Load calendar events once
   async function loadCalendarEvents() {
     setCalendarLoading(true);
     setCalendarError("");
@@ -413,7 +498,7 @@ useEffect(() => {
     const { data, error } = await supabase
       .from("events")
       .select("id, country, province, city, genre, show_date, note, flyer_path, track_id, created_at")
-      .gte("show_date", today) // ✅ future-only at the DB level
+      .gte("show_date", today)
       .order("show_date", { ascending: true })
       .order("created_at", { ascending: false });
 
@@ -428,62 +513,55 @@ useEffect(() => {
     setCalendarEvents((data ?? []) as EventRow[]);
   }
 
- // ✅ Only show upcoming events + only those matching current filters
-const calendarMatches = useMemo(() => {
-  const today = localTodayISO();
+  // ✅ Only show upcoming events + only those matching current filters
+  const calendarMatches = useMemo(() => {
+    const today = localTodayISO();
 
-  const co = country.trim().toLowerCase();
-  const pr = province.trim().toLowerCase();
-  const cc = city.trim().toLowerCase();
-  const gg = genre.trim().toLowerCase();
+    const co = country.trim().toLowerCase();
+    const pr = province.trim().toLowerCase();
+    const cc = city.trim().toLowerCase();
+    const gg = genre.trim().toLowerCase();
 
-  // 1) Filter upcoming + filter-match
-  const filteredUpcoming = calendarEvents.filter((ev) => {
-    const d = (ev.show_date ?? "").slice(0, 10);
-    if (!d) return false;
+    const filteredUpcoming = calendarEvents.filter((ev) => {
+      const d = (ev.show_date ?? "").slice(0, 10);
+      if (!d) return false;
+      if (d < today) return false;
 
-    // upcoming only
-    if (d < today) return false;
+      const evCountry = (ev.country ?? "").toLowerCase();
+      const evProvince = (ev.province ?? "").toLowerCase();
+      const evCity = (ev.city ?? "").toLowerCase();
+      const evGenre = (ev.genre ?? "").toLowerCase();
 
-    const evCountry = (ev.country ?? "").toLowerCase();
-    const evProvince = (ev.province ?? "").toLowerCase();
-    const evCity = (ev.city ?? "").toLowerCase();
-    const evGenre = (ev.genre ?? "").toLowerCase();
+      const matchCountry = !co || evCountry.includes(co);
+      const matchProvince = !pr || evProvince.includes(pr);
+      const matchCity = !cc || evCity.includes(cc);
+      const matchGenre = !gg || evGenre.includes(gg);
 
-    const matchCountry = !co || evCountry.includes(co);
-    const matchProvince = !pr || evProvince.includes(pr);
-    const matchCity = !cc || evCity.includes(cc);
-    const matchGenre = !gg || evGenre.includes(gg);
+      return matchCountry && matchProvince && matchCity && matchGenre;
+    });
 
-    return matchCountry && matchProvince && matchCity && matchGenre;
-  });
+    const seen = new Set<string>();
+    const unique: EventRow[] = [];
 
-  // 2) De-dupe by DATE + EVENT NAME (note)
-  const seen = new Set<string>();
-  const unique: EventRow[] = [];
+    for (const ev of filteredUpcoming) {
+      const d = (ev.show_date ?? "").slice(0, 10);
+      const nameKey = normSpaces(ev.note ?? "").toUpperCase();
+      const key = nameKey ? `${d}::${nameKey}` : `ID::${ev.id}`;
 
-  for (const ev of filteredUpcoming) {
-    const d = (ev.show_date ?? "").slice(0, 10);
-    const nameKey = normSpaces(ev.note ?? "").toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(ev);
+      if (unique.length >= 200) break;
+    }
 
-    const key = nameKey ? `${d}::${nameKey}` : `ID::${ev.id}`;
+    unique.sort((a, b) => {
+      const da = (a.show_date ?? "").slice(0, 10);
+      const db = (b.show_date ?? "").slice(0, 10);
+      return da.localeCompare(db);
+    });
 
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(ev);
-
-    if (unique.length >= 200) break;
-  }
-
-  // 3) Sort AFTER unique exists
-  unique.sort((a, b) => {
-    const da = (a.show_date ?? "").slice(0, 10);
-    const db = (b.show_date ?? "").slice(0, 10);
-    return da.localeCompare(db);
-  });
-
-  return unique;
-}, [calendarEvents, country, province, city, genre]);
+    return unique;
+  }, [calendarEvents, country, province, city, genre]);
 
   async function creditAdShareOnce(perPageTracks: TrackView[]) {
     if (offlineMode) return;
@@ -499,7 +577,6 @@ const calendarMatches = useMemo(() => {
     });
 
     if (error) {
-      // Don’t break the radio if counting fails
       console.warn("ad_share increment failed:", error.message);
     }
   }
@@ -513,15 +590,14 @@ const calendarMatches = useMemo(() => {
 
     setStatus("Loading...");
 
-    // ===== EVENT RADIO MODE (date OR event show-name search) =====
     const cleanEventName = normSpaces(eventShowName || "").toUpperCase();
 
+    // ===== EVENT RADIO MODE =====
     if (date || cleanEventName) {
       setEventMode(true);
 
       let evQ = supabase
         .from("events")
-        // include new fields too (safe even if you don't use them here yet)
         .select("id, country, province, city, genre, show_date, note, flyer_path, track_id, created_at")
         .order("created_at", { ascending: false });
 
@@ -575,11 +651,8 @@ const calendarMatches = useMemo(() => {
 
       if (!trackIds.length) {
         setTracks([]);
-        if (cleanEventName) {
-          setStatus(`No songs found for event name: ${cleanEventName}`);
-        } else {
-          setStatus(`No events found for ${date} with ${city} + ${genre}.`);
-        }
+        if (cleanEventName) setStatus(`No songs found for event name: ${cleanEventName}`);
+        else setStatus(`No events found for ${date} with ${city} + ${genre}.`);
         return [];
       }
 
@@ -599,7 +672,7 @@ const calendarMatches = useMemo(() => {
         if (e.track_id) flyerByTrackId.set(e.track_id, e.flyer_path ?? null);
       }
 
-      const mapped: TrackView[] = (ts ?? []).map((r: TrackRow) => {
+      const mappedRaw: TrackView[] = (ts ?? []).map((r: TrackRow) => {
         const flyerPath = flyerByTrackId.get(r.id) ?? null;
         const flyerUrl = flyerPath ? withCacheBust(getFlyerUrl(flyerPath)) : "";
         return {
@@ -610,9 +683,11 @@ const calendarMatches = useMemo(() => {
         };
       });
 
+      // ✅ filter out banned
+      const mapped = mappedRaw.filter((t) => !banIdsRef.current.has(t.id));
+
       setTracks(mapped);
 
-      // keep genre dropdown stable (event tracks contain genres too)
       setMasterGenres((prev) => {
         const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
         for (const t of mapped) {
@@ -628,23 +703,22 @@ const calendarMatches = useMemo(() => {
       return mapped;
     }
 
-    // ===== NORMAL RADIO MODE (no date & no clean event name) =====
+    // ===== NORMAL RADIO MODE =====
     setEventMode(false);
     setEventGenreOptions([]);
     setEventCityOptions([]);
 
     const qRaw = q ?? "";
     const qClean = normSpaces(qRaw).trim();
-    const qSlug = qClean.replace(/\s+/g, "-"); // "1st show" -> "1st-show"
+    const qSlug = qClean.replace(/\s+/g, "-");
     const qLower = qClean.toLowerCase();
     const qSlugLower = qSlug.toLowerCase();
 
-  // ✅ BAND MODE: if q matches a band (by band_name/display_name/slug), load ALL tracks for that band
+    // ✅ BAND MODE
     if (qClean) {
       const qLike = `%${qClean}%`;
-      const qSlugGuess = qClean.trim().toLowerCase().replace(/\s+/g, "-"); // "1st show" -> "1st-show"
+      const qSlugGuess = qClean.trim().toLowerCase().replace(/\s+/g, "-");
 
-      // Try band_users first (human-friendly)
       const { data: bands, error: bandErr } = await supabase
         .from("band_users")
         .select("band_slug, band_name, display_name")
@@ -662,21 +736,20 @@ const calendarMatches = useMemo(() => {
         console.warn("Band lookup error:", bandErr.message);
       }
 
-      const best = (bands ?? []).find((b) => {
-        const bn = (b.band_name ?? "").trim().toLowerCase();
-        const dn = (b.display_name ?? "").trim().toLowerCase();
-        const qs = qClean.trim().toLowerCase();
-        return bn === qs || dn === qs;
-      }) ?? (bands?.[0] ?? null);
+      const best =
+        (bands ?? []).find((b) => {
+          const bn = (b.band_name ?? "").trim().toLowerCase();
+          const dn = (b.display_name ?? "").trim().toLowerCase();
+          const qs = qClean.trim().toLowerCase();
+          return bn === qs || dn === qs;
+        }) ?? (bands?.[0] ?? null);
 
       const matchedSlug = best?.band_slug?.trim() ?? "";
 
       if (matchedSlug) {
         const { data: all, error: allErr } = await supabase
           .from("tracks")
-          .select(
-            "id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,created_at"
-          )
+          .select("id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,created_at")
           .eq("band_slug", matchedSlug)
           .order("created_at", { ascending: false });
 
@@ -686,16 +759,17 @@ const calendarMatches = useMemo(() => {
           return [];
         }
 
-        const mappedAll: TrackView[] = (all ?? []).map((r: TrackRow) => ({
+        const mappedAllRaw: TrackView[] = (all ?? []).map((r: TrackRow) => ({
           ...r,
           url: getPublicUrl(r.file_path),
           artUrl: getArtworkUrl(r.art_path),
           flyerUrl: "",
         }));
 
+        const mappedAll = mappedAllRaw.filter((t) => !banIdsRef.current.has(t.id));
+
         setTracks(mappedAll);
 
-        // keep genre dropdown stable
         setMasterGenres((prev) => {
           const s = new Set(prev.map((x) => norm(x)).filter(Boolean));
           for (const t of mappedAll) {
@@ -706,27 +780,24 @@ const calendarMatches = useMemo(() => {
         });
 
         setStatus(`Band mode: ${best?.band_name ?? matchedSlug} • ${mappedAll.length} song(s)`);
-        return mappedAll; // ✅ IMPORTANT: don't call the radio RPC
+        return mappedAll;
       }
     }
 
-    // ===== NORMAL RADIO MODE (fallback: RPC) =====
+    // ===== NORMAL RADIO MODE (RPC) =====
     let { data, error } = await supabase.rpc("radio_pick_one_per_band_filtered", {
       p_country: country || null,
       p_province: province || null,
       p_city: city || null,
-
       p_genre: genre || null,
       p_q: qClean || null,
     });
 
-    // retry with slug if empty
     if ((!data || data.length === 0) && qSlug !== qClean && qSlug.length > 0) {
       const retry = await supabase.rpc("radio_pick_one_per_band_filtered", {
         p_country: country || null,
         p_province: province || null,
         p_city: city || null,
-
         p_genre: genre || null,
         p_q: qSlug || null,
       });
@@ -744,12 +815,14 @@ const calendarMatches = useMemo(() => {
       return [];
     }
 
-    const mapped: TrackView[] = (data ?? []).map((r: TrackRow) => ({
+    const mappedRaw: TrackView[] = (data ?? []).map((r: TrackRow) => ({
       ...r,
       url: getPublicUrl(r.file_path),
       artUrl: getArtworkUrl(r.art_path),
       flyerUrl: "",
     }));
+
+    const mapped = mappedRaw.filter((t) => !banIdsRef.current.has(t.id));
 
     setTracks(mapped);
 
@@ -766,12 +839,12 @@ const calendarMatches = useMemo(() => {
     return mapped;
   }
 
-  // ✅ Auto-load when filters change
+  // ✅ Auto-load when filters change (also re-load when bans change)
   useEffect(() => {
     loadTracks();
     syncUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [date, country, province, city, genre, q, eventShowName, offlineMode]);
+  }, [date, country, province, city, genre, q, eventShowName, offlineMode, banIds]);
 
   // ============== OPTIONS ==============
   const genreOptions = useMemo(() => {
@@ -801,28 +874,29 @@ const calendarMatches = useMemo(() => {
     const co = country.trim().toLowerCase();
     const pr = province.trim().toLowerCase();
     const cc = city.trim().toLowerCase();
-
     const gg = genre.trim().toLowerCase();
 
     const hasFilter = Boolean(qq || co || pr || cc || gg || date.trim());
-    if (!hasFilter) return tracks;
+    const base = hasFilter
+      ? tracks.filter((t) => {
+          const matchQ =
+            !qq ||
+            t.title.toLowerCase().includes(qq) ||
+            t.band_slug.toLowerCase().includes(qq) ||
+            t.band_slug.toLowerCase().includes(qqSlug);
 
-    return tracks.filter((t) => {
-      const matchQ =
-        !qq ||
-        t.title.toLowerCase().includes(qq) ||
-        t.band_slug.toLowerCase().includes(qq) ||
-        t.band_slug.toLowerCase().includes(qqSlug);
+          const matchCountry = !co || (t.country ?? "").toLowerCase().includes(co);
+          const matchProvince = !pr || (t.province ?? "").toLowerCase().includes(pr);
+          const matchCity = !cc || (t.city ?? "").toLowerCase().includes(cc);
+          const matchGenre = !gg || (t.genre ?? "").toLowerCase().includes(gg);
 
-      const matchCountry = !co || (t.country ?? "").toLowerCase().includes(co);
-      const matchProvince = !pr || (t.province ?? "").toLowerCase().includes(pr);
-      const matchCity = !cc || (t.city ?? "").toLowerCase().includes(cc);
-      
-      const matchGenre = !gg || (t.genre ?? "").toLowerCase().includes(gg);
+          return matchQ && matchCountry && matchProvince && matchCity && matchGenre;
+        })
+      : tracks;
 
-      return matchQ && matchCountry && matchProvince && matchCity && matchGenre;
-    });
-  }, [tracks, q, country, province, city, genre, date]);
+    // ✅ extra safety: never include banned
+    return base.filter((t) => !banIds.has(t.id));
+  }, [tracks, q, country, province, city, genre, date, banIds]);
 
   // Build a fresh shuffled queue whenever the filtered list changes
   useEffect(() => {
@@ -903,6 +977,7 @@ const calendarMatches = useMemo(() => {
   }, [nowPlaying?.id]);
 
   async function go() {
+    // If current track became banned/removed, just move on
     if (!filtered.length) return;
 
     if (!queue.length) {
@@ -943,6 +1018,11 @@ const calendarMatches = useMemo(() => {
     go();
   }
 
+  // ✅ Swipe remove from queue (session-only)
+  function removeFromQueue(trackId: string) {
+    setQueue((q0) => q0.filter((t) => t.id !== trackId));
+  }
+
   // ============== Progressive WHERE handlers ==============
   const prettyBreadcrumb = useMemo(() => {
     const parts = [country, province, city].map((x) => normSpaces(x)).filter(Boolean);
@@ -953,18 +1033,15 @@ const calendarMatches = useMemo(() => {
     if (step === "country") {
       setProvince("");
       setCity("");
-
       setWhereStep("country");
       return;
     }
     if (step === "province") {
       setCity("");
-
       setWhereStep("province");
       return;
     }
     if (step === "city") {
-
       setWhereStep("city");
       return;
     }
@@ -975,7 +1052,6 @@ const calendarMatches = useMemo(() => {
     setCountry(clean);
     setProvince("");
     setCity("");
-
     setWhereStep("province");
   }
 
@@ -983,7 +1059,6 @@ const calendarMatches = useMemo(() => {
     const clean = toTitleCaseSmart(v);
     setProvince(clean);
     setCity("");
-
     setWhereStep("city");
   }
 
@@ -992,8 +1067,6 @@ const calendarMatches = useMemo(() => {
     setCity(clean);
     setWhereStep("city");
   }
-
-
 
   function openFilters() {
     setFiltersOpen(true);
@@ -1009,8 +1082,6 @@ const calendarMatches = useMemo(() => {
 
     if (!offlineMode) {
       await loadTracks();
-
-      // ✅ Count ONE hit per band for the tracks that were loaded by GO
       setTimeout(() => {
         creditAdShareOnce(filtered);
       }, 0);
@@ -1030,6 +1101,247 @@ const calendarMatches = useMemo(() => {
 
   const mainMaxWidth = 1000;
 
+  // ============================
+  // Queue Row (Swipe-to-remove)
+  // ============================
+function QueueRow({ t }: { t: TrackView }) {
+  const SWIPE_OPEN_AT = 70;     // how far left to snap open
+  const SWIPE_DELETE_AT = 145;  // how far left to auto-delete (optional)
+  const OPEN_X = -120;          // parked position when open (reveals button)
+  const TAP_SLOP = 8;           // px: movement under this is treated like a click
+
+  const startX = useRef<number | null>(null);
+  const startY = useRef<number | null>(null);
+  const dragging = useRef(false);
+  const moved = useRef(false);
+  const pointerIdRef = useRef<number | null>(null);
+
+  const [dx, setDx] = useState(0);
+  const [open, setOpen] = useState(false);
+
+  function closeRow() {
+    setOpen(false);
+    setDx(0);
+  }
+
+  function openRow() {
+    setOpen(true);
+    setDx(OPEN_X);
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+    dragging.current = true;
+    moved.current = false;
+    pointerIdRef.current = e.pointerId;
+
+    // capture so we keep getting move events during drag
+    (e.currentTarget as any).setPointerCapture?.(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    // ✅ if not actively dragging, do not move (prevents "following mouse")
+    if (!dragging.current) return;
+    if (startX.current == null || startY.current == null) return;
+
+    const deltaX = e.clientX - startX.current;
+    const deltaY = e.clientY - startY.current;
+
+    if (Math.abs(deltaX) > TAP_SLOP || Math.abs(deltaY) > TAP_SLOP) moved.current = true;
+
+    // If the gesture is more vertical than horizontal, treat as scrolling
+    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) return;
+
+    // left swipe only. If row is open, start from OPEN_X.
+    const base = open ? OPEN_X : 0;
+    const next = base + deltaX;
+
+    const clamped = Math.max(-180, Math.min(0, next));
+    setDx(clamped);
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    dragging.current = false;
+
+    // ✅ release capture so it truly stops tracking
+    const pid = pointerIdRef.current;
+    if (pid != null) {
+      try {
+        (e.currentTarget as any).releasePointerCapture?.(pid);
+      } catch {}
+    }
+    pointerIdRef.current = null;
+
+    // If the user was basically clicking (no real movement), don't force open/close.
+    if (!moved.current) {
+      // If already open, a plain click closes it (nice UX)
+      if (open) closeRow();
+      return;
+    }
+
+    // Hard yank -> delete
+    if (dx <= -SWIPE_DELETE_AT) {
+      removeFromQueue(t.id);
+      return;
+    }
+
+    // snap open / close
+    if (dx <= -SWIPE_OPEN_AT) openRow();
+    else closeRow();
+  }
+
+  const thumb = eventMode ? (t.flyerUrl || t.artUrl) : t.artUrl;
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 14,
+        overflow: "hidden",
+      }}
+    >
+      {/* ✅ BACKGROUND ACTION AREA (clickable) */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: 14,
+          background: "rgba(255,0,0,0.10)",
+          border: "1px solid rgba(255,0,0,0.25)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          paddingRight: 10,
+          gap: 10,
+        }}
+      >
+        <button
+          onClick={() => removeFromQueue(t.id)}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,0,0,0.45)",
+            background: "rgba(255,255,255,0.92)",
+            color: "rgba(200,0,0,0.95)",
+            fontWeight: 950,
+            cursor: "pointer",
+          }}
+          title="Remove from queue"
+        >
+          Remove
+        </button>
+      </div>
+
+      {/* ✅ FOREGROUND CARD */}
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        style={{
+          transform: `translateX(${open ? OPEN_X : dx}px)`,
+          // ✅ once open, always stick to OPEN_X (unless actively dragging)
+          transition: dragging.current ? "none" : "transform 160ms ease",
+          touchAction: "pan-y",
+          display: "grid",
+          gridTemplateColumns: "44px 1fr auto",
+          gap: 10,
+          alignItems: "center",
+          border: "1px solid #eee",
+          borderRadius: 14,
+          padding: "10px 12px",
+          background: "white",
+        }}
+      >
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumb}
+            alt=""
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              objectFit: "cover",
+              border: "1px solid #eee",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              border: "1px solid #eee",
+              opacity: 0.25,
+            }}
+          />
+        )}
+
+        {/* ✅ Make the song title area a link to band page */}
+        <Link
+          href={`/b/${t.band_slug}`}
+          onClick={(e) => {
+            // If row is open, close it but still allow navigation
+            // Also prevent the swipe container from treating this as a close-click.
+            e.stopPropagation();
+            if (open) closeRow();
+          }}
+          style={{
+            textDecoration: "none",
+            color: "inherit",
+            minWidth: 0,
+            display: "block",
+          }}
+          title={`Open ${t.band_slug}`}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 950,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {t.title}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                opacity: 0.75,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {t.city} • {t.genre} • {t.band_slug}
+            </div>
+          </div>
+        </Link>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            playTrack(t);
+          }}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 12,
+            border: "1px solid #ddd",
+            fontWeight: 900,
+            background: "black",
+            color: "#2bff00",
+          }}
+        >
+          Play
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
   return (
     <main
       style={{
@@ -1040,7 +1352,7 @@ const calendarMatches = useMemo(() => {
         color: "black",
       }}
     >
-      {/* ✅ SPLASH SCREEN (one-time per session) */}
+      {/* ✅ SPLASH SCREEN */}
       {splashPhase !== "off" ? (
         <div
           style={{
@@ -1070,7 +1382,7 @@ const calendarMatches = useMemo(() => {
         </div>
       ) : null}
 
-      {/* ===== HERO: Full screen logo feel ===== */}
+      {/* ===== HERO ===== */}
       {!hasStarted && filtersOpen ? (
         <div
           style={{
@@ -1169,9 +1481,9 @@ const calendarMatches = useMemo(() => {
 
             {/* Event mode note */}
             {date ? (
- <div style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>
-  Event radio matches using <b>City + Genre</b>.
-</div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>
+                Event radio matches using <b>City + Genre</b>.
+              </div>
             ) : null}
 
             {/* ===== MAIN LAYOUT ===== */}
@@ -1194,7 +1506,9 @@ const calendarMatches = useMemo(() => {
                       padding: 14,
                     }}
                   >
-                    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>NOW PLAYING</div>
+                    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
+                      NOW PLAYING
+                    </div>
 
                     <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                       <div style={{ display: "grid", gap: 6 }}>
@@ -1221,6 +1535,22 @@ const calendarMatches = useMemo(() => {
                           >
                             Open Band Page →
                           </Link>
+
+                          <button
+                            onClick={requestBanNowPlaying}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              border: "1px solid #ddd",
+                              fontWeight: 950,
+                              background: "white",
+                              color: "black",
+                              cursor: "pointer",
+                            }}
+                            title="Never play this song again"
+                          >
+                            Ban 🚫
+                          </button>
                         </div>
                       </div>
 
@@ -1273,7 +1603,9 @@ const calendarMatches = useMemo(() => {
                       padding: 14,
                     }}
                   >
-                    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>NOW PLAYING</div>
+                    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
+                      NOW PLAYING
+                    </div>
                     <div style={{ marginTop: 10, fontWeight: 950, lineHeight: 1.2 }}>Nothing playing yet.</div>
                     <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>
                       Hit <b>Play / Next</b> or open <b>Filters</b> and smash <b>RADIO LETS GO</b>.
@@ -1285,98 +1617,90 @@ const calendarMatches = useMemo(() => {
               {/* RIGHT: Queue */}
               <section style={{ display: "grid", gap: 8 }}>
                 {queue.map((t) => (
-                  <div
-                    key={t.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "44px 1fr auto",
-                      gap: 10,
-                      alignItems: "center",
-                      border: "1px solid #eee",
-                      borderRadius: 14,
-                      padding: "10px 12px",
-                    }}
-                  >
-                    {(() => {
-                      const thumb = eventMode ? (t.flyerUrl || t.artUrl) : t.artUrl;
-
-                      return thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={thumb}
-                          alt=""
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 12,
-                            objectFit: "cover",
-                            border: "1px solid #eee",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 12,
-                            border: "1px solid #eee",
-                            opacity: 0.25,
-                          }}
-                        />
-                      );
-                    })()}
-
-                    <Link
-                      href={`/b/${t.band_slug}`}
-                      style={{
-                        textDecoration: "none",
-                        color: "inherit",
-                        minWidth: 0,
-                        display: "block",
-                      }}
-                      title={`Open ${t.band_slug}`}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: 950,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            opacity: 0.75,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {t.city} • {t.genre} • {t.band_slug}
-                        </div>
-                      </div>
-                    </Link>
-
-                    <button
-                      onClick={() => playTrack(t)}
-                      style={{
-                        padding: "8px 12px",
-                        borderRadius: 12,
-                        border: "1px solid #ddd",
-                        fontWeight: 900,
-                        background: "black",
-                        color: "#2bff00",
-                      }}
-                    >
-                      Play
-                    </button>
-                  </div>
+                  <QueueRow key={t.id} t={t} />
                 ))}
               </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ===== BAN CONFIRM MODAL ===== */}
+      {banConfirmOpen ? (
+        <div
+          onClick={() => (banWorking ? null : setBanConfirmOpen(false))}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 20000,
+            background: "rgba(0,0,0,0.72)",
+            display: "grid",
+            placeItems: "center",
+            padding: 14,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(520px, 96vw)",
+              borderRadius: 18,
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(20,20,20,0.95)",
+              color: "white",
+              overflow: "hidden",
+              boxShadow: "0 18px 55px rgba(0,0,0,0.45)",
+            }}
+          >
+            <div style={{ padding: 14, borderBottom: "1px solid rgba(255,255,255,0.15)" }}>
+              <div style={{ fontWeight: 950, letterSpacing: 0.5 }}>Never play this song again?</div>
+              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 6 }}>
+                {nowPlaying?.title ?? "—"}
+              </div>
+            </div>
+
+            <div style={{ padding: 14, display: "grid", gap: 10 }}>
+              {banError ? <div style={{ fontSize: 12, color: "#ffb3b3" }}>Error: {banError}</div> : null}
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                <button
+                  disabled={banWorking}
+                  onClick={() => setBanConfirmOpen(false)}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    background: "transparent",
+                    color: "white",
+                    fontWeight: 900,
+                    cursor: banWorking ? "not-allowed" : "pointer",
+                    opacity: banWorking ? 0.6 : 1,
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  disabled={banWorking}
+                  onClick={confirmBanNowPlaying}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    background: "white",
+                    color: "black",
+                    fontWeight: 950,
+                    cursor: banWorking ? "not-allowed" : "pointer",
+                    opacity: banWorking ? 0.75 : 1,
+                  }}
+                  title="Ban and skip"
+                >
+                  {banWorking ? "Banning..." : "Ban + Skip"}
+                </button>
+              </div>
+
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                This ban is saved to your account and applies to future radio sessions.
+              </div>
             </div>
           </div>
         </div>
@@ -1445,8 +1769,6 @@ const calendarMatches = useMemo(() => {
                     borderRadius: 999,
                     border: "1px solid rgba(43,255,0,0.35)",
                     background: "rgba(0,0,0,0.45)",
-
-                    // glow
                     textShadow: "0 0 10px rgba(43,255,0,0.55), 0 0 22px rgba(43,255,0,0.28)",
                     boxShadow: "0 0 16px rgba(43,255,0,0.22)",
                   }}
@@ -1486,7 +1808,6 @@ const calendarMatches = useMemo(() => {
                 WebkitOverflowScrolling: "touch",
               }}
             >
-              {/* ✅ Centered narrow column for ALL controls */}
               <div
                 style={{
                   width: "100%",
@@ -1498,7 +1819,9 @@ const calendarMatches = useMemo(() => {
               >
                 {/* WHAT */}
                 <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>What Genre?:)</div>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
+                    What Genre?:)
+                  </div>
                   <select value={genre} onChange={(e) => setGenre(e.target.value)} className="sl-select">
                     {(genreOptions.length ? genreOptions : [""]).map((g) => (
                       <option key={g || "any"} value={g}>
@@ -1510,7 +1833,9 @@ const calendarMatches = useMemo(() => {
 
                 {/* WHERE */}
                 <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>From Where?:</div>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
+                    From Where?:
+                  </div>
 
                   {prettyBreadcrumb.length ? (
                     <div
@@ -1533,7 +1858,6 @@ const calendarMatches = useMemo(() => {
                               if (idx === 0) resetBelow("country");
                               if (idx === 1) resetBelow("province");
                               if (idx === 2) resetBelow("city");
-                              
                             }}
                             style={{
                               padding: "6px 10px",
@@ -1687,13 +2011,11 @@ const calendarMatches = useMemo(() => {
                       </button>
                     </div>
                   ) : null}
-
-
                 </div>
 
                 {/* WHO */}
                 <div style={{ display: "grid", gap: 10 }}>
-                  {/* Event search + Calendar button inline */}
+                  {/* Event search + Calendar */}
                   <div style={{ display: "grid", gap: 6 }}>
                     <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
                       Event search (exact show name):
@@ -1811,7 +2133,7 @@ const calendarMatches = useMemo(() => {
         </div>
       ) : null}
 
-      {/* ===== CALENDAR MODAL (pops over the filterbox) ===== */}
+      {/* ===== CALENDAR MODAL ===== */}
       {calendarOpen ? (
         <div
           onClick={() => setCalendarOpen(false)}
@@ -1887,77 +2209,77 @@ const calendarMatches = useMemo(() => {
                 </div>
               ) : null}
 
-{calendarMatches.map((ev) => {
-  const d = formatShowDate(ev.show_date, { weekday: true });
-  const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
-  const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
+              {calendarMatches.map((ev) => {
+                const d = formatShowDate(ev.show_date, { weekday: true });
+                const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
+                const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
 
-  const flyer = ev.flyer_path ? withCacheBust(getFlyerUrl(ev.flyer_path)) : "";
+                const flyer = ev.flyer_path ? withCacheBust(getFlyerUrl(ev.flyer_path)) : "";
 
-  return (
-    <button
-      key={ev.id}
-      type="button"
-      onClick={() => pickEventAndPlay(ev)}
-      style={{
-        textAlign: "left",
-        width: "100%",
-        padding: "12px 14px",
-        borderRadius: 14,
-        border: "1px solid rgba(255,255,255,0.18)",
-        background: "rgba(255,255,255,0.08)",
-        color: "white",
-        cursor: "pointer",
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => pickEventAndPlay(ev)}
+                    style={{
+                      textAlign: "left",
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: 14,
+                      border: "1px solid rgba(255,255,255,0.18)",
+                      background: "rgba(255,255,255,0.08)",
+                      color: "white",
+                      cursor: "pointer",
+                      display: "grid",
+                      gridTemplateColumns: "52px 1fr",
+                      gap: 12,
+                      alignItems: "center",
+                    }}
+                    title="Pick this event and start playing"
+                  >
+                    {flyer ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={flyer}
+                        alt=""
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 12,
+                          objectFit: "cover",
+                          border: "1px solid rgba(255,255,255,0.16)",
+                          background: "rgba(0,0,0,0.35)",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 12,
+                          border: "1px solid rgba(255,255,255,0.16)",
+                          background: "rgba(0,0,0,0.25)",
+                          opacity: 0.55,
+                        }}
+                      />
+                    )}
 
-        display: "grid",
-        gridTemplateColumns: "52px 1fr",
-        gap: 12,
-        alignItems: "center",
-      }}
-      title="Pick this event and start playing"
-    >
-      {flyer ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={flyer}
-          alt=""
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 12,
-            objectFit: "cover",
-            border: "1px solid rgba(255,255,255,0.16)",
-            background: "rgba(0,0,0,0.35)",
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.16)",
-            background: "rgba(0,0,0,0.25)",
-            opacity: 0.55,
-          }}
-        />
-      )}
-
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {d} — {name}
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {meta}
-        </div>
-      </div>
-    </button>
-  );
-})}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {d} — {name}
+                      </div>
+                      <div style={{ fontSize: 12, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {meta}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
       ) : null}
+
       <StreetLevelFooter />
     </main>
   );
