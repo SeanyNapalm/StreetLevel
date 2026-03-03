@@ -9,6 +9,20 @@ import { supabase } from "../lib/supabaseClient";
 import StreetLevelHeader from "./components/StreetLevelHeader";
 import { formatShowDate } from "../lib/date";
 
+
+type BandHeader = {
+  band_slug: string;
+  band_name: string | null;
+  display_name: string | null;
+  avatar_path: string | null;
+  country: string | null;
+  province: string | null;
+  city: string | null;
+  genre: string | null;
+  bio: string | null;
+};
+
+
 type EventRow = {
   id: string;
 
@@ -44,6 +58,12 @@ type TrackView = TrackRow & { url: string; artUrl: string; flyerUrl?: string };
 
 function getPublicUrl(path: string) {
   const res = supabase.storage.from("tracks").getPublicUrl(path);
+  return res?.data?.publicUrl ?? "";
+}
+
+function getAvatarUrl(path: string | null) {
+  if (!path) return "";
+  const res = supabase.storage.from("avatars").getPublicUrl(path);
   return res?.data?.publicUrl ?? "";
 }
 
@@ -167,6 +187,8 @@ const CITIES_BY_PROVINCE: Record<string, string[]> = {
 type WhereStep = "country" | "province" | "city";
 
 export default function HomePage() {
+const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
+
   const [status, setStatus] = useState("");
 
   // WHO
@@ -715,6 +737,8 @@ export default function HomePage() {
     const qSlugLower = qSlug.toLowerCase();
 
     // ✅ BAND MODE
+    if (!qClean) setBandHeader(null);
+    
     if (qClean) {
       const qLike = `%${qClean}%`;
       const qSlugGuess = qClean.trim().toLowerCase().replace(/\s+/g, "-");
@@ -730,23 +754,53 @@ export default function HomePage() {
             `display_name.ilike.${qLike}`,
           ].join(",")
         )
-        .limit(10);
+        .limit(25);
 
       if (bandErr) {
         console.warn("Band lookup error:", bandErr.message);
       }
 
-      const best =
-        (bands ?? []).find((b) => {
-          const bn = (b.band_name ?? "").trim().toLowerCase();
-          const dn = (b.display_name ?? "").trim().toLowerCase();
-          const qs = qClean.trim().toLowerCase();
-          return bn === qs || dn === qs;
-        }) ?? (bands?.[0] ?? null);
+function scoreBand(b: any, qClean: string) {
+  const q = qClean.trim().toLowerCase();
+  const qSlug = q.replace(/\s+/g, "-");
+
+  const slug = (b.band_slug ?? "").trim().toLowerCase();
+  const name = (b.band_name ?? "").trim().toLowerCase();
+  const disp = (b.display_name ?? "").trim().toLowerCase();
+
+  if (slug === qSlug || slug === q) return 1000;
+  if (name === q || disp === q) return 900;
+
+  if (slug.startsWith(qSlug) || slug.startsWith(q)) return 800;
+  if (name.startsWith(q) || disp.startsWith(q)) return 700;
+
+  if (slug.includes(qSlug) || slug.includes(q)) return 500;
+  if (name.includes(q) || disp.includes(q)) return 400;
+
+  return 0;
+}
+
+const candidates = (bands ?? [])
+  .map((b) => ({ b, s: scoreBand(b, qClean) }))
+  .sort((a, c) => c.s - a.s);
+
+const best = candidates[0]?.b ?? null;
 
       const matchedSlug = best?.band_slug?.trim() ?? "";
 
       if (matchedSlug) {
+        // ✅ load band header/profile for the UI
+const { data: bh } = await supabase
+  .from("band_users")
+  .select("band_slug, band_name, display_name, avatar_path, country, province, city, genre, bio")
+  .eq("band_slug", matchedSlug)
+  .order("user_id", { ascending: true })
+  .limit(1)
+  .maybeSingle();
+
+setBandHeader((bh as any) ?? { band_slug: matchedSlug });
+
+
         const { data: all, error: allErr } = await supabase
           .from("tracks")
           .select("id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,created_at")
@@ -781,6 +835,9 @@ export default function HomePage() {
 
         setStatus(`Band mode: ${best?.band_name ?? matchedSlug} • ${mappedAll.length} song(s)`);
         return mappedAll;
+      } else {
+        // qClean exists but no actual band matched
+        setBandHeader(null);
       }
     }
 
@@ -1623,11 +1680,33 @@ function QueueRow({ t }: { t: TrackView }) {
 
                     <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                       <div style={{ display: "grid", gap: 6 }}>
-                        <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1.1 }}>{nowPlaying.title}</div>
+                      <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1.1 }}>
+  {bandHeader
+    ? (bandHeader.display_name || bandHeader.band_name || bandHeader.band_slug)
+    : (nowPlaying.title || "Untitled")}
+</div>
 
-                        <div style={{ fontSize: 12, opacity: 0.75 }}>
-                          {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")} • {(nowPlaying.band_slug || "—")}
-                        </div>
+{bandHeader ? (
+  <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
+    Now playing: <b>{nowPlaying.title || "Untitled"}</b>
+  </div>
+) : null}
+
+<div style={{ fontSize: 12, opacity: 0.75 }}>
+  {bandHeader ? (
+    <>
+      {(bandHeader.genre || "—")} • {(bandHeader.city || "—")}
+      {bandHeader.province ? `, ${bandHeader.province}` : ""}
+      {bandHeader.country ? `, ${bandHeader.country}` : ""}
+      {" • "}
+      {(bandHeader.band_slug || "—")}
+    </>
+  ) : (
+    <>
+      {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")} • {(nowPlaying.band_slug || "—")}
+    </>
+  )}
+</div>
 
                         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                           <Link
@@ -1647,21 +1726,21 @@ function QueueRow({ t }: { t: TrackView }) {
                             Open Band Page →
                           </Link>
 
-                          <button
-                            onClick={requestBanNowPlaying}
-                            style={{
-                              padding: "10px 12px",
-                              borderRadius: 12,
-                              border: "1px solid #ddd",
-                              fontWeight: 950,
-                              background: "white",
-                              color: "black",
-                              cursor: "pointer",
-                            }}
-                            title={`Never play ${nowPlaying.band_slug || "this band"} — ${nowPlaying.title || "this song"} again`}
-                          >
-                            Ban 🚫
-                          </button>
+  <button
+    onClick={requestBanNowPlaying}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 12,
+      border: "1px solid #ddd",
+      fontWeight: 950,
+      background: "white",
+      color: "black",
+      cursor: "pointer",
+    }}
+    title={`Never play ${nowPlaying.band_slug || "this band"} — ${nowPlaying.title || "this song"} again`}
+  >
+    Ban 🚫
+  </button>
                         </div>
                       </div>
 
@@ -1689,40 +1768,113 @@ function QueueRow({ t }: { t: TrackView }) {
                         </div>
                       ) : null}
 
-                      {(eventMode ? nowPlaying.flyerUrl : nowPlaying.artUrl) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={(eventMode ? nowPlaying.flyerUrl : nowPlaying.artUrl) as string}
-                          alt="Now playing artwork"
-                          style={{
-                            width: "100%",
-                            aspectRatio: "1 / 1",
-                            objectFit: "cover",
-                            borderRadius: 16,
-                            border: "1px solid #eee",
-                            marginTop: 8,
-                          }}
-                        />
-                      ) : null}
+{(() => {
+  const bandAvatarUrl = bandHeader?.avatar_path
+    ? withCacheBust(getAvatarUrl(bandHeader.avatar_path))
+    : "";
+
+  const nowImageUrl = eventMode
+    ? (nowPlaying.flyerUrl || nowPlaying.artUrl)
+    : (bandAvatarUrl || nowPlaying.artUrl);
+
+  return nowImageUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={nowImageUrl}
+      alt={bandHeader ? "Band avatar" : "Now playing artwork"}
+      style={{
+        width: "100%",
+        aspectRatio: "1 / 1",
+        objectFit: "cover",
+        borderRadius: 16,
+        border: "1px solid #eee",
+        marginTop: 8,
+      }}
+    />
+  ) : null;
+})()}
                     </div>
                   </section>
-                ) : (
-                  <section
-                    style={{
-                      border: "1px solid #eee",
-                      borderRadius: 18,
-                      padding: 14,
-                    }}
-                  >
-                    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
-                      NOW PLAYING
-                    </div>
-                    <div style={{ marginTop: 10, fontWeight: 950, lineHeight: 1.2 }}>Nothing playing yet.</div>
-                    <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>
-                      Hit <b>Play / Next</b> or open <b>Filters</b> and smash <b>RADIO LETS GO</b>.
-                    </div>
-                  </section>
-                )}
+) : bandHeader ? (
+  <section
+    style={{
+      border: "1px solid #eee",
+      borderRadius: 18,
+      padding: 14,
+    }}
+  >
+    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
+      BAND MODE
+    </div>
+
+    <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+      <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1.1 }}>
+        {bandHeader.display_name || bandHeader.band_name || bandHeader.band_slug}
+      </div>
+
+      <div style={{ fontSize: 12, opacity: 0.75 }}>
+        {(bandHeader.genre || "—")} • {(bandHeader.city || "—")}
+        {bandHeader.province ? `, ${bandHeader.province}` : ""}
+        {bandHeader.country ? `, ${bandHeader.country}` : ""} • {bandHeader.band_slug}
+      </div>
+
+      {bandHeader.avatar_path ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={withCacheBust(getAvatarUrl(bandHeader.avatar_path))}
+          alt="Band avatar"
+          style={{
+            width: "100%",
+            aspectRatio: "1 / 1",
+            objectFit: "cover",
+            borderRadius: 16,
+            border: "1px solid #eee",
+            marginTop: 8,
+          }}
+        />
+      ) : null}
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <Link
+          href={`/b/${bandHeader.band_slug}`}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid #ddd",
+            textDecoration: "none",
+            fontWeight: 950,
+            background: "black",
+            color: "white",
+            display: "inline-block",
+          }}
+          title="Open band page"
+        >
+          Open Band Page →
+        </Link>
+      </div>
+
+      <div style={{ fontSize: 12, opacity: 0.7 }}>
+        No playable songs in your queue. (If you banned them all, that’s why!)
+      </div>
+    </div>
+  </section>
+) : (
+  <section
+    style={{
+      border: "1px solid #eee",
+      borderRadius: 18,
+      padding: 14,
+    }}
+  >
+    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
+      NOW PLAYING
+    </div>
+    <div style={{ marginTop: 10, fontWeight: 950, lineHeight: 1.2 }}>Nothing playing yet.</div>
+    <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>
+      Hit <b>Play / Next</b> or open <b>Filters</b> and smash <b>RADIO LETS GO</b>.
+    </div>
+  </section>
+)}
               </div>
 
               {/* RIGHT: Queue */}
