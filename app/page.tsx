@@ -1777,7 +1777,7 @@ function QueueRow({ t }: { t: TrackView }) {
               {banError ? <div style={{ fontSize: 12, color: "#ffb3b3" }}>Error: {banError}</div> : null}
 
               <div style={{ fontSize: 12, opacity: 0.7 }}>
-                This ban is saved to your account and applies to future radio sessions. it can be undone by visiting that bands page, and clicking to UNDO BAN the song
+                This ban is saved to your account and applies to future radio sessions. it can be undone by visiting that bands page, and clicking to "Lift Song Ban" the song
               </div>
 
 

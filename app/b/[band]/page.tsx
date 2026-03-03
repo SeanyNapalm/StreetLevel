@@ -208,6 +208,64 @@ async function buyTrack(track: TrackView) {
 
   const [status, setStatus] = useState("");
 
+// ✅ logged-in user (optional) + banned track ids for this user
+const [userId, setUserId] = useState<string>("");
+const [bannedIds, setBannedIds] = useState<Set<string>>(new Set());
+
+async function loadMyBans() {
+  // user might not be logged in — that's fine
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user?.id ?? "";
+  setUserId(uid);
+
+  if (!uid) {
+    setBannedIds(new Set());
+    return;
+  }
+
+  const { data: bans, error } = await supabase
+    .from("user_banned_tracks")
+    .select("track_id")
+    .eq("user_id", uid);
+
+  if (error) {
+    console.warn("loadMyBans error:", error.message);
+    setBannedIds(new Set());
+    return;
+  }
+
+  const s = new Set<string>((bans ?? []).map((b: any) => String(b.track_id)));
+  setBannedIds(s);
+}
+
+async function undoBan(trackId: string) {
+  if (!userId) return;
+
+  // ✅ optimistic UI
+  setBannedIds((prev) => {
+    const next = new Set(prev);
+    next.delete(trackId);
+    return next;
+  });
+
+  const { error } = await supabase
+    .from("user_banned_tracks")
+    .delete()
+    .eq("user_id", userId)
+    .eq("track_id", trackId);
+
+  if (error) {
+    console.warn("undoBan error:", error.message);
+
+    // rollback on failure
+    setBannedIds((prev) => {
+      const next = new Set(prev);
+      next.add(trackId);
+      return next;
+    });
+  }
+}
+
   const [tracks, setTracks] = useState<TrackView[]>([]);
   const [profile, setProfile] = useState<BandUserProfileRow | null>(null);
 
@@ -388,6 +446,10 @@ useEffect(() => {
   loadProfile();
   loadBandTracks();
   loadUpcomingShows();
+
+  // ✅ load bans for logged-in user (if any)
+  loadMyBans();
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [bandSlug]);
 
@@ -697,23 +759,44 @@ useEffect(() => {
 
 
 
-        {/* BUY BUTTON */}
-        <button
-          onClick={() => buyTrack(t)}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid #000",
-            background: "black",
-            color: "#2bff00",
-            fontWeight: 900,
-            cursor: "pointer",
-            width: "fit-content",
-          }}
-          title="Buy this track"
-        >
-          Buy track • {priceLabel}
-        </button>
+{/* BUY + (optional) UNDO BAN */}
+<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+  <button
+    onClick={() => buyTrack(t)}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid #000",
+      background: "black",
+      color: "#2bff00",
+      fontWeight: 950,
+      cursor: "pointer",
+      width: "fit-content",
+    }}
+    title="Buy this track"
+  >
+    Buy track • {priceLabel}
+  </button>
+
+  {bannedIds.has(t.id) ? (
+    <button
+      onClick={() => undoBan(t.id)}
+      style={{
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid rgba(43,255,0,0.35)",
+        background: "rgba(0,0,0,0.85)",
+        color: "red",
+        fontWeight: 950,
+        cursor: "pointer",
+        width: "fit-content",
+      }}
+      title="Undo ban for this track"
+    >
+      Lift Song Ban?
+    </button>
+  ) : null}
+</div>
 
         <div style={{ fontSize: 12, opacity: 0.6 }}>
           Purchases coming next — this button will launch checkout.
