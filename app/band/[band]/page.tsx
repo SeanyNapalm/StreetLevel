@@ -234,6 +234,10 @@ const uploadGateMsg = useMemo(() => {
     const [eventsLoading, setEventsLoading] = useState(false);
     const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
+    const [matchOpen, setMatchOpen] = useState(false);
+    const [matchedEvent, setMatchedEvent] = useState<EventRow | null>(null);
+    const [matchLoading, setMatchLoading] = useState(false);
+
     // Lightbox state (Gallery)
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -259,6 +263,48 @@ const uploadGateMsg = useMemo(() => {
       if (!eventTrackId && tracks.length) setEventTrackId(tracks[0].id);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tracks.length]);
+
+    async function checkForExistingShow(date: string) {
+  if (!date) return;
+
+  // Use profile city + a genre guess (track-selected genre if possible, else profile)
+  const city = toTitleCaseSmart(profileCity) || "Ottawa";
+
+  const genreGuess =
+    (eventTrackId ? getEventGenreFromTrackId(eventTrackId, tracks) : toTitleCaseSmart(profileGenre)) || "Punk";
+
+  setMatchLoading(true);
+
+  try {
+    const { data, error } = await supabase
+      .from("events")
+      .select("id,band_slug,country,province,city,genre,show_date,flyer_path,track_id,note,created_at")
+      .eq("show_date", date)
+      .eq("city", city)
+      .eq("genre", genreGuess)
+      .neq("band_slug", bandSlug)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (error) {
+      // don’t block the user — just silently fail
+      console.warn("checkForExistingShow error:", error.message);
+      return;
+    }
+
+    const hit = (data ?? [])[0] as EventRow | undefined;
+
+    if (hit) {
+      setMatchedEvent(hit);
+      setMatchOpen(true);
+    } else {
+      setMatchedEvent(null);
+      setMatchOpen(false);
+    }
+  } finally {
+    setMatchLoading(false);
+  }
+}
 
     async function getAuthedUserId(): Promise<string | null> {
       const { data, error } = await supabase.auth.getUser();
@@ -1767,12 +1813,22 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>DATE</div>
-                  <input
-                    type="date"
-                    value={showDate}
-                    onChange={(e) => setShowDate(e.target.value)}
-                    style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ccc" }}
-                  />
+<input
+  type="date"
+  value={showDate}
+  onChange={(e) => {
+    const v = e.target.value;
+    setShowDate(v);
+
+    // clear old match state
+    setMatchedEvent(null);
+    setMatchOpen(false);
+
+    // only check when there’s a real date
+    if (v) checkForExistingShow(v);
+  }}
+  style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ccc" }}
+/>
                 </div>
 
                 <div style={{ display: "grid", gap: 6, minWidth: 260 }}>
@@ -2232,6 +2288,134 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
             </div>
           </div>
         ) : null}
+
+{matchOpen && matchedEvent ? (
+  <div
+    onClick={() => setMatchOpen(false)}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.72)",
+      display: "grid",
+      placeItems: "center",
+      zIndex: 9999,
+      padding: 18,
+    }}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "min(720px, 96vw)",
+        borderRadius: 18,
+        border: "1px solid rgba(255,255,255,0.18)",
+        background: "white",
+        padding: 16,
+        display: "grid",
+        gap: 12,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+        <div style={{ fontWeight: 950, letterSpacing: 0.5 }}>
+          Possible match found
+          {matchLoading ? <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>checking…</span> : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => setMatchOpen(false)}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            background: "black",
+            color: "white",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div style={{ fontSize: 13, lineHeight: 1.35 }}>
+        There is a <b>{matchedEvent.genre}</b> show in <b>{matchedEvent.city}</b>, created by{" "}
+        <b>{matchedEvent.band_slug}</b>.
+        <br />
+        They named it:{" "}
+        <b>{normSpaces(matchedEvent.note || "") || "(Unnamed event)"}</b>
+        <br />
+        Is this the show your band is playing?
+      </div>
+
+      {matchedEvent.flyer_path ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={withCacheBust(getFlyerUrl(matchedEvent.flyer_path))}
+          alt="Existing flyer"
+          style={{
+            width: "100%",
+            maxHeight: 360,
+            objectFit: "cover",
+            borderRadius: 14,
+            border: "1px solid #eee",
+          }}
+        />
+      ) : (
+        <div style={{ fontSize: 12, opacity: 0.7 }}>No flyer uploaded for that show yet.</div>
+      )}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => {
+            // NO
+            setMatchOpen(false);
+          }}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid #ccc",
+            background: "black",
+            color: "white",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          No
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            // YES: fill show name + adopt flyer
+            const existingName = normSpaces(matchedEvent.note || "").toUpperCase();
+            if (existingName) setShowName(existingName);
+
+            if (matchedEvent.flyer_path) {
+              setFlyerPath(matchedEvent.flyer_path);
+            }
+
+            setMatchOpen(false);
+          }}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid #ccc",
+            background: "black",
+            color: "#2bff00",
+            fontWeight: 950,
+            cursor: "pointer",
+          }}
+        >
+          Yes — we are on that bill!
+        </button>
+      </div>
+    </div>
+  </div>
+) : null}
+
+
+
+
         <StreetLevelFooter />
       </main>
     );
