@@ -2307,12 +2307,10 @@ function QueueRow({ t }: { t: TrackView }) {
 
                       <button
                         type="button"
-                        onClick={async () => {
-                          setCalendarOpen(true);
-                          if (!calendarEvents.length) {
-                            await loadCalendarEvents();
-                          }
-                        }}
+onClick={async () => {
+  setCalendarOpen(true);
+  await loadCalendarEvents(); // always refresh so deletions/edits don't look like ghosts
+}}
                         style={{
                           padding: "12px 14px",
                           borderRadius: 12,
