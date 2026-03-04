@@ -2326,15 +2326,16 @@ onChange={(e) => {
   >
     <div
       onClick={(e) => e.stopPropagation()}
-      style={{
-        width: "min(720px, 96vw)",
-        borderRadius: 18,
-        border: "1px solid rgba(255,255,255,0.18)",
-        background: "white",
-        padding: 16,
-        display: "grid",
-        gap: 12,
-      }}
+style={{
+  width: "min(720px, 96vw)",
+  maxHeight: "90vh",            // ✅ never exceed viewport height
+  overflow: "hidden",           // ✅ keep sticky footer clean
+  borderRadius: 18,
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "white",
+  display: "grid",
+  gridTemplateRows: "auto 1fr auto", // ✅ header / scroll area / sticky buttons
+}}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
         <div style={{ fontWeight: 950, letterSpacing: 0.5 }}>
