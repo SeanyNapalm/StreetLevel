@@ -224,7 +224,9 @@ const uploadGateMsg = useMemo(() => {
 
     // --- NEXT SHOW (events MVP) ---
     const [showDate, setShowDate] = useState<string>("");
-    const [showName, setShowName] = useState<string>(""); // ✅ NEW
+    const [showName, setShowName] = useState<string>("");
+    const [showNameLocked, setShowNameLocked] = useState(false); // ✅ lock when match accepted
+    
     const [eventTrackId, setEventTrackId] = useState<string>("");
     const [flyerPath, setFlyerPath] = useState<string | null>(null);
     const [flyerUploading, setFlyerUploading] = useState(false);
@@ -264,10 +266,13 @@ const uploadGateMsg = useMemo(() => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tracks.length]);
 
-    async function checkForExistingShow(date: string) {
+
+
+async function checkForExistingShow(date: string) {
   if (!date) return;
 
-  // Use profile city + a genre guess (track-selected genre if possible, else profile)
+  const country = toTitleCaseSmart(profileCountry) || "";
+  const province = toTitleCaseSmart(profileProvince) || "";
   const city = toTitleCaseSmart(profileCity) || "Ottawa";
 
   const genreGuess =
@@ -276,18 +281,21 @@ const uploadGateMsg = useMemo(() => {
   setMatchLoading(true);
 
   try {
-    const { data, error } = await supabase
+    let q = supabase
       .from("events")
       .select("id,band_slug,country,province,city,genre,show_date,flyer_path,track_id,note,created_at")
       .eq("show_date", date)
       .eq("city", city)
       .eq("genre", genreGuess)
-      .neq("band_slug", bandSlug)
-      .order("created_at", { ascending: true })
-      .limit(1);
+      .neq("band_slug", bandSlug);
+
+    // ✅ only add these filters if we actually have values
+    if (country) q = q.eq("country", country);
+    if (province) q = q.eq("province", province);
+
+    const { data, error } = await q.order("created_at", { ascending: true }).limit(1);
 
     if (error) {
-      // don’t block the user — just silently fail
       console.warn("checkForExistingShow error:", error.message);
       return;
     }
@@ -1816,37 +1824,50 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 <input
   type="date"
   value={showDate}
-  onChange={(e) => {
-    const v = e.target.value;
-    setShowDate(v);
+onChange={(e) => {
+  const v = e.target.value;
+  setShowDate(v);
 
-    // clear old match state
-    setMatchedEvent(null);
-    setMatchOpen(false);
+  // new date = new show context
+  setShowNameLocked(false);
 
-    // only check when there’s a real date
-    if (v) checkForExistingShow(v);
-  }}
+  // clear old match state
+  setMatchedEvent(null);
+  setMatchOpen(false);
+
+  // only check when there’s a real date
+  if (v) checkForExistingShow(v);
+}}
   style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ccc" }}
 />
                 </div>
 
                 <div style={{ display: "grid", gap: 6, minWidth: 260 }}>
                   <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900 }}>SHOW NAME</div>
-                  <input
-                    value={showName}
-                    onChange={(e) => setShowName(e.target.value.toUpperCase())}
-                    placeholder="Ex: Unique Show Name! Punk Pizza Party!"
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      border: "1px solid #ccc",
-                      textTransform: "uppercase",
-                      fontSize: 9,   // 👈 try 12, 13, or 14 — pick what feels best
-                      fontWeight: 800 // optional: makes it a bit less shouty
-                    }}
-                    title="Optional — saved in CAPS to keep things consistent"
-                  />
+<input
+  value={showName}
+  onChange={(e) => setShowName(e.target.value.toUpperCase())}
+  disabled={showNameLocked}
+  placeholder="Ex: Unique Show Name! Punk Pizza Party!"
+  style={{
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #ccc",
+    textTransform: "uppercase",
+    fontSize: 9,
+    fontWeight: 800,
+    opacity: showNameLocked ? 0.65 : 1,
+    cursor: showNameLocked ? "not-allowed" : "text",
+    background: showNameLocked ? "#f4f4f4" : "white",
+  }}
+  title={showNameLocked ? "Locked because you matched an existing event." : "Optional — saved in CAPS to keep things consistent"}
+/>
+
+{showNameLocked ? (
+  <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 900, marginTop: 6 }}>
+    Locked (you matched an existing show name).
+  </div>
+) : null}
                 </div>
 
                 <div style={{ display: "grid", gap: 6, minWidth: 260 }}>
@@ -1926,18 +1947,19 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
               {flyerUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={flyerUrl}
-                  alt="flyer preview"
-                  style={{
-                    width: "100%",
-                    maxWidth: 520,
-                    aspectRatio: "1 / 1",
-                    objectFit: "cover",
-                    borderRadius: 16,
-                    border: "1px solid #eee",
-                  }}
-                />
+<img
+  src={flyerUrl}
+  alt="flyer preview"
+  style={{
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: 720,
+    objectFit: "contain",
+    borderRadius: 16,
+    border: "1px solid #eee",
+    background: "#f6f6f6",
+  }}
+/>
               ) : (
                 <div style={{ fontSize: 12, opacity: 0.7 }}>Tip: pick date → upload flyer → pick a track → save. (Saving again for the same date updates it.)</div>
               )}
@@ -2348,17 +2370,18 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
       {matchedEvent.flyer_path ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={withCacheBust(getFlyerUrl(matchedEvent.flyer_path))}
-          alt="Existing flyer"
-          style={{
-            width: "100%",
-            maxHeight: 360,
-            objectFit: "cover",
-            borderRadius: 14,
-            border: "1px solid #eee",
-          }}
-        />
+<img
+  src={withCacheBust(getFlyerUrl(matchedEvent.flyer_path))}
+  alt="Existing flyer"
+  style={{
+    height: "100%",
+    maxHeight: 520,
+    objectFit: "contain",
+    borderRadius: 14,
+    border: "1px solid #eee",
+    background: "#f6f6f6",
+  }}
+/>
       ) : (
         <div style={{ fontSize: 12, opacity: 0.7 }}>No flyer uploaded for that show yet.</div>
       )}
@@ -2385,17 +2408,31 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 
         <button
           type="button"
-          onClick={() => {
-            // YES: fill show name + adopt flyer
-            const existingName = normSpaces(matchedEvent.note || "").toUpperCase();
-            if (existingName) setShowName(existingName);
+onClick={async () => {
+  // YES: fill show name + adopt flyer + lock name + AUTO-SAVE
+  const existingName = normSpaces(matchedEvent.note || "").toUpperCase();
+  const existingFlyer = matchedEvent.flyer_path || null;
 
-            if (matchedEvent.flyer_path) {
-              setFlyerPath(matchedEvent.flyer_path);
-            }
+  if (existingName) setShowName(existingName);
+  if (existingFlyer) setFlyerPath(existingFlyer);
 
-            setMatchOpen(false);
-          }}
+  setShowNameLocked(true);
+  setMatchOpen(false);
+
+  // ✅ ensure state lands before saving (React state is async)
+  await new Promise((r) => setTimeout(r, 0));
+
+  // ✅ if they didn't pick a track yet, default to first track (optional but nice)
+  if (!eventTrackId && tracks.length) {
+    setEventTrackId(tracks[0].id);
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  // ✅ auto-save the submission
+  saveNextShow();
+}}
+
+
           style={{
             padding: "10px 12px",
             borderRadius: 12,
