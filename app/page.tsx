@@ -1779,18 +1779,20 @@ function QueueRow({ t }: { t: TrackView }) {
 
   return nowImageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={nowImageUrl}
-      alt={bandHeader ? "Band avatar" : "Now playing artwork"}
-      style={{
-        width: "100%",
-        aspectRatio: "1 / 1",
-        objectFit: "cover",
-        borderRadius: 16,
-        border: "1px solid #eee",
-        marginTop: 8,
-      }}
-    />
+<img
+  src={nowImageUrl}
+  alt={bandHeader ? "Band avatar" : "Now playing artwork"}
+  style={{
+    width: "100%",
+    aspectRatio: "1 / 1",
+    objectFit: "contain",          // ✅ key change: no crop
+    borderRadius: 16,
+    border: "1px solid #eee",
+    marginTop: 8,
+    background: "#f6f6f6",         // ✅ makes the empty space look nice
+    display: "block",
+  }}
+/>
   ) : null;
 })()}
                     </div>

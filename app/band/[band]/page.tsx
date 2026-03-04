@@ -2326,68 +2326,98 @@ onChange={(e) => {
   >
     <div
       onClick={(e) => e.stopPropagation()}
-style={{
-  width: "min(720px, 96vw)",
-  maxHeight: "90vh",            // ✅ never exceed viewport height
-  overflow: "hidden",           // ✅ keep sticky footer clean
-  borderRadius: 18,
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "white",
-  display: "grid",
-  gridTemplateRows: "auto 1fr auto", // ✅ header / scroll area / sticky buttons
-}}
+      style={{
+        width: "min(720px, 96vw)",
+        maxHeight: "90vh",                 // ✅ never exceed viewport
+        overflow: "hidden",                // ✅ keeps sticky footer clean
+        borderRadius: 18,
+        border: "1px solid rgba(255,255,255,0.18)",
+        background: "white",
+        display: "grid",
+        gridTemplateRows: "auto 1fr auto", // ✅ header / scroll / sticky buttons
+      }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-        <div style={{ fontWeight: 950, letterSpacing: 0.5 }}>
-          Possible match found
-          {matchLoading ? <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>checking…</span> : null}
+      {/* HEADER */}
+      <div style={{ padding: 16, paddingBottom: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+          <div style={{ fontWeight: 950, letterSpacing: 0.5 }}>
+            Possible match found
+            {matchLoading ? <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>checking…</span> : null}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMatchOpen(false)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid #ccc",
+              background: "black",
+              color: "white",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+            title="Close"
+          >
+            ✕
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setMatchOpen(false)}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            background: "black",
-            color: "white",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          ✕
-        </button>
       </div>
 
-      <div style={{ fontSize: 13, lineHeight: 1.35 }}>
-        There is a <b>{matchedEvent.genre}</b> show in <b>{matchedEvent.city}</b>, created by{" "}
-        <b>{matchedEvent.band_slug}</b>.
-        <br />
-        They named it:{" "}
-        <b>{normSpaces(matchedEvent.note || "") || "(Unnamed event)"}</b>
-        <br />
-        Is this the show your band is playing?
+      {/* SCROLL AREA */}
+      <div
+        style={{
+          padding: 16,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <div style={{ fontSize: 13, lineHeight: 1.35 }}>
+          There is a <b>{matchedEvent.genre}</b> show in <b>{matchedEvent.city}</b>, created by{" "}
+          <b>{matchedEvent.band_slug}</b>.
+          <br />
+          They named it:{" "}
+          <b>{normSpaces(matchedEvent.note || "") || "(Unnamed event)"}</b>
+          <br />
+          Is this the show your band is playing?
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          {matchedEvent.flyer_path ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={withCacheBust(getFlyerUrl(matchedEvent.flyer_path))}
+              alt="Existing flyer"
+              style={{
+                width: "100%",
+                maxHeight: "56vh", // ✅ leaves room for sticky buttons
+                objectFit: "contain",
+                borderRadius: 14,
+                border: "1px solid #eee",
+                background: "#f6f6f6",
+                display: "block",
+              }}
+            />
+          ) : (
+            <div style={{ fontSize: 12, opacity: 0.7 }}>No flyer uploaded for that show yet.</div>
+          )}
+        </div>
       </div>
 
-      {matchedEvent.flyer_path ? (
-        // eslint-disable-next-line @next/next/no-img-element
-<img
-  src={withCacheBust(getFlyerUrl(matchedEvent.flyer_path))}
-  alt="Existing flyer"
-  style={{
-    height: "100%",
-    maxHeight: 520,
-    objectFit: "contain",
-    borderRadius: 14,
-    border: "1px solid #eee",
-    background: "#f6f6f6",
-  }}
-/>
-      ) : (
-        <div style={{ fontSize: 12, opacity: 0.7 }}>No flyer uploaded for that show yet.</div>
-      )}
-
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+      {/* STICKY BUTTON BAR */}
+      <div
+        style={{
+          position: "sticky",
+          bottom: 0,
+          background: "white",
+          borderTop: "1px solid #eee",
+          padding: 16,
+          display: "flex",
+          gap: 10,
+          justifyContent: "flex-end",
+          flexWrap: "wrap",
+        }}
+      >
         <button
           type="button"
           onClick={() => {
@@ -2409,31 +2439,18 @@ style={{
 
         <button
           type="button"
-onClick={async () => {
-  // YES: fill show name + adopt flyer + lock name + AUTO-SAVE
-  const existingName = normSpaces(matchedEvent.note || "").toUpperCase();
-  const existingFlyer = matchedEvent.flyer_path || null;
+          onClick={() => {
+            // YES: fill show name + adopt flyer + lock name
+            const existingName = normSpaces(matchedEvent.note || "").toUpperCase();
+            if (existingName) setShowName(existingName);
 
-  if (existingName) setShowName(existingName);
-  if (existingFlyer) setFlyerPath(existingFlyer);
+            if (matchedEvent.flyer_path) {
+              setFlyerPath(matchedEvent.flyer_path);
+            }
 
-  setShowNameLocked(true);
-  setMatchOpen(false);
-
-  // ✅ ensure state lands before saving (React state is async)
-  await new Promise((r) => setTimeout(r, 0));
-
-  // ✅ if they didn't pick a track yet, default to first track (optional but nice)
-  if (!eventTrackId && tracks.length) {
-    setEventTrackId(tracks[0].id);
-    await new Promise((r) => setTimeout(r, 0));
-  }
-
-  // ✅ auto-save the submission
-  saveNextShow();
-}}
-
-
+            setShowNameLocked(true);
+            setMatchOpen(false);
+          }}
           style={{
             padding: "10px 12px",
             borderRadius: 12,
