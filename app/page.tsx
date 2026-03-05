@@ -190,6 +190,11 @@ export default function HomePage() {
   const STREETLEVEL_LOGO = "/StreetLevelLogo-Punk.jpg"; // or png if you prefer
   const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
   const [status, setStatus] = useState("");
+ 
+
+  // prevents the "rebuild queue on filtered change" effect from nuking our start
+  const startingRef = useRef(false);
+
 
   // WHO
   const [q, setQ] = useState("");
@@ -216,6 +221,7 @@ export default function HomePage() {
   const [eventCityOptions, setEventCityOptions] = useState<string[]>([]);
 
   const [tracks, setTracks] = useState<TrackView[]>([]);
+  const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [pendingFreshRound, setPendingFreshRound] = useState(false);
 
   // ✅ Calendar modal
@@ -707,14 +713,16 @@ function wireCarPlayHandlers() {
   }
 
   // ============== DATA LOAD ==============
-  async function loadTracks(): Promise<TrackView[]> {
-    if (offlineMode) {
-      setStatus("Offline mode: not refreshing from server.");
-      return [];
-    }
+async function loadTracks(): Promise<TrackView[]> {
+  if (offlineMode) {
+    setStatus("Offline mode: not refreshing from server.");
+    return [];
+  }
 
-    setStatus("Loading...");
+  setIsLoadingTracks(true);
+  setStatus("Loading...");
 
+  try {
     const cleanEventName = normSpaces(eventShowName || "").toUpperCase();
 
     // ===== EVENT RADIO MODE =====
@@ -836,12 +844,10 @@ function wireCarPlayHandlers() {
     const qRaw = q ?? "";
     const qClean = normSpaces(qRaw).trim();
     const qSlug = qClean.replace(/\s+/g, "-");
-    const qLower = qClean.toLowerCase();
-    const qSlugLower = qSlug.toLowerCase();
 
     // ✅ BAND MODE
     if (!qClean) setBandHeader(null);
-    
+
     if (qClean) {
       const qLike = `%${qClean}%`;
       const qSlugGuess = qClean.trim().toLowerCase().replace(/\s+/g, "-");
@@ -863,46 +869,45 @@ function wireCarPlayHandlers() {
         console.warn("Band lookup error:", bandErr.message);
       }
 
-function scoreBand(b: any, qClean: string) {
-  const q = qClean.trim().toLowerCase();
-  const qSlug = q.replace(/\s+/g, "-");
+      function scoreBand(b: any, qClean2: string) {
+        const qq = qClean2.trim().toLowerCase();
+        const qqSlug = qq.replace(/\s+/g, "-");
 
-  const slug = (b.band_slug ?? "").trim().toLowerCase();
-  const name = (b.band_name ?? "").trim().toLowerCase();
-  const disp = (b.display_name ?? "").trim().toLowerCase();
+        const slug = (b.band_slug ?? "").trim().toLowerCase();
+        const name = (b.band_name ?? "").trim().toLowerCase();
+        const disp = (b.display_name ?? "").trim().toLowerCase();
 
-  if (slug === qSlug || slug === q) return 1000;
-  if (name === q || disp === q) return 900;
+        if (slug === qqSlug || slug === qq) return 1000;
+        if (name === qq || disp === qq) return 900;
 
-  if (slug.startsWith(qSlug) || slug.startsWith(q)) return 800;
-  if (name.startsWith(q) || disp.startsWith(q)) return 700;
+        if (slug.startsWith(qqSlug) || slug.startsWith(qq)) return 800;
+        if (name.startsWith(qq) || disp.startsWith(qq)) return 700;
 
-  if (slug.includes(qSlug) || slug.includes(q)) return 500;
-  if (name.includes(q) || disp.includes(q)) return 400;
+        if (slug.includes(qqSlug) || slug.includes(qq)) return 500;
+        if (name.includes(qq) || disp.includes(qq)) return 400;
 
-  return 0;
-}
+        return 0;
+      }
 
-const candidates = (bands ?? [])
-  .map((b) => ({ b, s: scoreBand(b, qClean) }))
-  .sort((a, c) => c.s - a.s);
+      const candidates = (bands ?? [])
+        .map((b) => ({ b, s: scoreBand(b, qClean) }))
+        .sort((a, c) => c.s - a.s);
 
-const best = candidates[0]?.b ?? null;
+      const best = candidates[0]?.b ?? null;
 
       const matchedSlug = best?.band_slug?.trim() ?? "";
 
       if (matchedSlug) {
         // ✅ load band header/profile for the UI
-const { data: bh } = await supabase
-  .from("band_users")
-  .select("band_slug, band_name, display_name, avatar_path, country, province, city, genre, bio")
-  .eq("band_slug", matchedSlug)
-  .order("user_id", { ascending: true })
-  .limit(1)
-  .maybeSingle();
+        const { data: bh } = await supabase
+          .from("band_users")
+          .select("band_slug, band_name, display_name, avatar_path, country, province, city, genre, bio")
+          .eq("band_slug", matchedSlug)
+          .order("user_id", { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-setBandHeader((bh as any) ?? { band_slug: matchedSlug });
-
+        setBandHeader((bh as any) ?? { band_slug: matchedSlug });
 
         const { data: all, error: allErr } = await supabase
           .from("tracks")
@@ -997,7 +1002,10 @@ setBandHeader((bh as any) ?? { band_slug: matchedSlug });
 
     setStatus(mapped.length ? "" : "No radio tracks yet.");
     return mapped;
+  } finally {
+    setIsLoadingTracks(false);
   }
+}
 
   // ✅ Auto-load when filters change (also re-load when bans change)
   useEffect(() => {
@@ -1252,23 +1260,24 @@ function playTrack(t: TrackView) {
     setFiltersOpen(false);
   }
 
-  async function radioLetsGo() {
-    setHasStarted(true);
-    closeFilters();
+async function radioLetsGo() {
+  if (isLoadingTracks) return;
 
-    if (!offlineMode) {
-      await loadTracks();
-      setTimeout(() => {
-        creditAdShareOnce(filtered);
-      }, 0);
-    }
+  setHasStarted(true);
+  closeFilters();
 
-    if (!nowPlaying) {
-      setTimeout(() => {
-        go();
-      }, 30);
-    }
+  // loadTracks() now owns the loading state (try/finally inside it)
+  await loadTracks();
+
+  // credit only when we actually hit the server
+  if (!offlineMode) {
+    setTimeout(() => {
+      creditAdShareOnce(filtered);
+    }, 0);
   }
+
+  go();
+}
 
   const overlayTitle = useMemo(() => {
     if (date) return "Event Radio";
@@ -2491,26 +2500,28 @@ onClick={async () => {
                     marginTop: 6,
                   }}
                 >
-                  <button
-                    onClick={radioLetsGo}
-                    style={{
-                      width: "100%",
-                      maxWidth: `${FILTER_GO_MAX}px`,
-                      margin: "0 auto",
-                      display: "block",
-                      padding: "14px 14px",
-                      borderRadius: 14,
-                      border: "1px solid #ddd",
-                      fontWeight: 950,
-                      background: "black",
-                      color: "#2bff00",
-                      cursor: "pointer",
-                      letterSpacing: 0.6,
-                    }}
-                    title="Start the radio with whatever you picked (or nothing!)"
-                  >
-                    RADIO LETS GO!
-                  </button>
+<button
+  onClick={radioLetsGo}
+  disabled={isLoadingTracks}
+  style={{
+    width: "100%",
+    maxWidth: `${FILTER_GO_MAX}px`,
+    margin: "0 auto",
+    display: "block",
+    padding: "14px 14px",
+    borderRadius: 14,
+    border: "1px solid #ddd",
+    fontWeight: 950,
+    background: "black",
+    color: "#2bff00",
+    cursor: isLoadingTracks ? "not-allowed" : "pointer",
+    letterSpacing: 0.6,
+    opacity: isLoadingTracks ? 0.6 : 1,
+  }}
+  title="Start the radio with whatever you picked (or nothing!)"
+>
+  {isLoadingTracks ? "LOADING..." : "RADIO LETS GO!"}
+</button>
                 </div>
 
                 <div style={{ fontSize: 12, color: "white", opacity: 0.7, lineHeight: 1.35 }}>
