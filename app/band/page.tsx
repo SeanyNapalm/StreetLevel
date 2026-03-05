@@ -381,7 +381,7 @@ export default function BandLoginPage() {
           </>
         ) : (
           <>
-            <div style={{ fontWeight: 900, marginBottom: 10 }}>Sign in with email</div>
+            <div style={{ fontWeight: 900, marginBottom: 10 }}>Type in your Email Address, we will send an email to verify ya!</div>
 
             <input
               value={email}
