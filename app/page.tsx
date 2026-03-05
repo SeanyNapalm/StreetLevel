@@ -187,8 +187,8 @@ const CITIES_BY_PROVINCE: Record<string, string[]> = {
 type WhereStep = "country" | "province" | "city";
 
 export default function HomePage() {
-const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
-
+  const STREETLEVEL_LOGO = "/StreetLevelLogo-Punk.jpg"; // or png if you prefer
+  const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
   const [status, setStatus] = useState("");
 
   // WHO
@@ -231,6 +231,14 @@ const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
   const [queue, setQueue] = useState<TrackView[]>([]);
   const [nowPlaying, setNowPlaying] = useState<TrackView | null>(null);
 
+ // ✅ NEW: history stack for "previous track"
+  const [history, setHistory] = useState<TrackView[]>([]);
+  const historyRef = useRef<TrackView[]>([]);
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+
   // Autoplay
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
@@ -253,13 +261,108 @@ const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
   }, []);
 
   // ==========================
-  // ✅ BANS (user-specific)
+  // BANS (user-specific)
   // ==========================
   const [banIds, setBanIds] = useState<Set<string>>(new Set());
   const banIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     banIdsRef.current = banIds;
   }, [banIds]);
+
+
+  useEffect(() => {
+  wireCarPlayHandlers();
+  // set a baseline metadata so logo shows even before first play
+  setCarPlayNowPlaying(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+
+
+  function setCarPlayNowPlaying(t: TrackView | null) {
+  if (typeof window === "undefined") return;
+
+  const ms: any = (navigator as any).mediaSession;
+  const MM: any = (window as any).MediaMetadata;
+  if (!ms || !MM) return;
+
+  if (!t) {
+    ms.metadata = new MM({
+      title: "StreetLevel",
+      artist: "",
+      album: "",
+      artwork: [{ src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" }],
+    });
+    return;
+  }
+
+  // what we want CarPlay to show:
+  // artwork = StreetLevel logo (stable / always shows)
+  // title = song title
+  // artist = band slug (or display name if you ever add it to TrackRow later)
+  ms.metadata = new MM({
+    title: t.title || "Untitled",
+    artist: t.band_slug || "StreetLevel",
+    album: "StreetLevel",
+    artwork: [{ src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" }],
+  });
+}
+
+function wireCarPlayHandlers() {
+  const ms: any = (navigator as any).mediaSession;
+  if (!ms?.setActionHandler) return;
+
+  // NEXT button (steering wheel / CarPlay)
+  ms.setActionHandler("nexttrack", () => {
+    go(); // ✅ your existing behavior
+  });
+
+  // PREV button: restart if >3s, else go previous track
+  ms.setActionHandler("previoustrack", () => {
+    const el = audioRef.current;
+    const t = nowPlaying;
+
+    if (!t || !el) return;
+
+    if (el.currentTime > 3) {
+      el.currentTime = 0; // restart current song
+      el.play?.().catch(() => {});
+      return;
+    }
+
+    // otherwise go to previous track if we have it
+    const h = historyRef.current;
+    const prev = h[0];
+    if (!prev) {
+      // nothing in history -> just restart
+      el.currentTime = 0;
+      el.play?.().catch(() => {});
+      return;
+    }
+
+    // remove prev from history and push current back onto queue front
+    setHistory((hh) => hh.slice(1));
+    setQueue((q0) => (t ? [t, ...q0] : q0));
+    setNowPlaying(prev);
+  });
+
+  // Optional: seek buttons if the car exposes them
+  ms.setActionHandler("seekbackward", (details: any) => {
+    const el = audioRef.current;
+    if (!el) return;
+    const s = details?.seekOffset ?? 10;
+    el.currentTime = Math.max(0, el.currentTime - s);
+  });
+
+  ms.setActionHandler("seekforward", (details: any) => {
+    const el = audioRef.current;
+    if (!el) return;
+    const s = details?.seekOffset ?? 10;
+    el.currentTime = Math.min(el.duration || Infinity, el.currentTime + s);
+  });
+}
+
+
 
   async function refreshBans() {
     try {
@@ -1000,23 +1103,26 @@ setBandHeader((bh as any) ?? { band_slug: matchedSlug });
   }, [filtered.length]);
 
   // After a fresh server reload (RPC), auto-start a new round
-  useEffect(() => {
-    if (!pendingFreshRound) return;
-    if (!filtered.length) return;
+useEffect(() => {
+  if (!pendingFreshRound) return;
+  if (!filtered.length) return;
 
-    const q2 = shuffle(filtered);
-    const [next, ...rest] = q2;
+  const q2 = shuffle(filtered);
+  const [next, ...rest] = q2;
 
-    setNowPlaying(next ?? null);
-    setQueue(rest);
-    setPendingFreshRound(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingFreshRound, filtered.length]);
+  if (nowPlaying) setHistory((h) => [nowPlaying, ...h].slice(0, 50));
+
+  setNowPlaying(next ?? null);
+  setQueue(rest);
+  setPendingFreshRound(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [pendingFreshRound, filtered.length]);
 
   // Try to start audio whenever nowPlaying changes
   useEffect(() => {
     if (!nowPlaying) return;
 
+    setCarPlayNowPlaying(nowPlaying);
     setAutoplayBlocked(false);
 
     const t = setTimeout(async () => {
@@ -1033,43 +1139,56 @@ setBandHeader((bh as any) ?? { band_slug: matchedSlug });
     return () => clearTimeout(t);
   }, [nowPlaying?.id]);
 
-  async function go() {
-    // If current track became banned/removed, just move on
-    if (!filtered.length) return;
+async function go() {
+  if (!filtered.length) return;
 
-    if (!queue.length) {
-      if (offlineMode) {
-        const q2 = shuffle(filtered);
-        const [next, ...rest] = q2;
-        setNowPlaying(next ?? null);
-        setQueue(rest);
-        return;
-      }
+  // If queue empty, either reshuffle offline or reload online
+  if (!queue.length) {
+    if (offlineMode) {
+      const q2 = shuffle(filtered);
+      const [next, ...rest] = q2;
 
-      setPendingFreshRound(true);
-      await loadTracks();
+      // ✅ history push
+      if (nowPlaying) setHistory((h) => [nowPlaying, ...h].slice(0, 50));
+
+      setNowPlaying(next ?? null);
+      setQueue(rest);
       return;
     }
 
-    const [next, ...rest] = queue;
-    setNowPlaying(next);
-    setQueue(rest);
+    setPendingFreshRound(true);
+    await loadTracks();
+    return;
   }
 
-  function playTrack(t: TrackView) {
-    setQueue((q0) => {
-      const idx = q0.findIndex((x) => x.id === t.id);
-      if (idx >= 0) {
-        const rest = [...q0.slice(0, idx), ...q0.slice(idx + 1)];
-        setNowPlaying(t);
-        return rest;
-      }
+  const [next, ...rest] = queue;
 
-      const base = shuffle(filtered).filter((x) => x.id !== t.id);
+  // ✅ history push
+  if (nowPlaying) setHistory((h) => [nowPlaying, ...h].slice(0, 50));
+
+  setNowPlaying(next);
+  setQueue(rest);
+}
+
+function playTrack(t: TrackView) {
+  // ✅ history push for manual selections
+  if (nowPlaying && nowPlaying.id !== t.id) {
+    setHistory((h) => [nowPlaying, ...h].slice(0, 50));
+  }
+
+  setQueue((q0) => {
+    const idx = q0.findIndex((x) => x.id === t.id);
+    if (idx >= 0) {
+      const rest = [...q0.slice(0, idx), ...q0.slice(idx + 1)];
       setNowPlaying(t);
-      return base;
-    });
-  }
+      return rest;
+    }
+
+    const base = shuffle(filtered).filter((x) => x.id !== t.id);
+    setNowPlaying(t);
+    return base;
+  });
+}
 
   function onEndedAdvance() {
     go();
