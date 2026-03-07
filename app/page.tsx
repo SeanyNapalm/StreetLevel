@@ -3,7 +3,7 @@
 "use client";
 import StreetLevelFooter from "./components/StreetLevelFooter";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 import StreetLevelHeader from "./components/StreetLevelHeader";
@@ -1076,8 +1076,12 @@ async function loadTracks(): Promise<TrackView[]> {
     return tracks.filter((t) => !banIds.has(t.id));
   }, [tracks, banIds]);
 
-  // Build a fresh shuffled queue whenever the filtered list changes
+  
+  // Build / repair queue when playable tracks change,
+  // but do NOT interfere while RADIO LETS GO is actively starting playback.
   useEffect(() => {
+    if (startingRef.current) return;
+
     if (!filtered.length) {
       setQueue([]);
       setNowPlaying(null);
@@ -1091,16 +1095,23 @@ async function loadTracks(): Promise<TrackView[]> {
     }
 
     const shuffled = shuffle(filtered);
-    setQueue(shuffled);
 
-    if (nowPlaying && !shuffled.some((t) => t.id === nowPlaying.id)) {
-      setNowPlaying(null);
-      setAutoplayBlocked(false);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+    if (nowPlaying) {
+      const withoutCurrent = shuffled.filter((t) => t.id !== nowPlaying.id);
+      setQueue(withoutCurrent);
+
+      if (!shuffled.some((t) => t.id === nowPlaying.id)) {
+        setNowPlaying(null);
+        setAutoplayBlocked(false);
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
       }
+      return;
     }
+
+    setQueue(shuffled);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered]);
 
@@ -1272,8 +1283,10 @@ function playTrack(t: TrackView) {
 
 async function radioLetsGo() {
   if (isLoadingTracks) return;
+  if (!hasStarted) return;
 
-  setHasStarted(true);
+  startingRef.current = true;
+
   closeFilters();
 
   const loaded = await loadTracks();
@@ -1282,6 +1295,7 @@ async function radioLetsGo() {
     setQueue([]);
     setNowPlaying(null);
     setAutoplayBlocked(false);
+    startingRef.current = false;
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -1304,7 +1318,10 @@ async function radioLetsGo() {
   setNowPlaying(next ?? null);
   setQueue(rest);
   setAutoplayBlocked(false);
+
+  startingRef.current = false;
 }
+
 
   const overlayTitle = useMemo(() => {
     if (date) return "Event Radio";
@@ -1316,7 +1333,7 @@ async function radioLetsGo() {
   // ============================
   // Queue Row (Swipe-to-remove)
   // ============================
-function QueueRow({ t }: { t: TrackView }) {
+const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
   const swipeEnabled = isNarrow; // ✅ swipe only on mobile/narrow screens
 
   const SWIPE_OPEN_AT = 70;
@@ -1662,7 +1679,7 @@ function QueueRow({ t }: { t: TrackView }) {
       </div>
     </div>
   );
-}
+});
 
 
   return (
@@ -1740,7 +1757,7 @@ function QueueRow({ t }: { t: TrackView }) {
               left={
                 <button
                   onClick={go}
-                  disabled={!filtered.length}
+                  disabled={!filtered.length || isLoadingTracks}
                   style={{
                     padding: "12px 16px",
                     borderRadius: 12,
@@ -1748,8 +1765,8 @@ function QueueRow({ t }: { t: TrackView }) {
                     fontWeight: 950,
                     background: "black",
                     color: "#2bff00",
-                    opacity: filtered.length ? 1 : 0.45,
-                    cursor: filtered.length ? "pointer" : "not-allowed",
+                    opacity: filtered.length && !isLoadingTracks ? 1 : 0.45,
+                    cursor: filtered.length && !isLoadingTracks ? "pointer" : "not-allowed",
                     whiteSpace: "nowrap",
                   }}
                   title="Play / Next"
@@ -2535,7 +2552,7 @@ onClick={async () => {
                 >
 <button
   onClick={radioLetsGo}
-  disabled={isLoadingTracks}
+  disabled={isLoadingTracks || !hasStarted}
   style={{
     width: "100%",
     maxWidth: `${FILTER_GO_MAX}px`,
@@ -2547,13 +2564,13 @@ onClick={async () => {
     fontWeight: 950,
     background: "black",
     color: "#2bff00",
-    cursor: isLoadingTracks ? "not-allowed" : "pointer",
+    cursor: isLoadingTracks || !hasStarted ? "not-allowed" : "pointer",
     letterSpacing: 0.6,
-    opacity: isLoadingTracks ? 0.6 : 1,
+    opacity: isLoadingTracks || !hasStarted ? 0.6 : 1,
   }}
   title="Start the radio with whatever you picked (or nothing!)"
 >
-  {isLoadingTracks ? "LOADING..." : "RADIO LETS GO!"}
+  {!hasStarted || isLoadingTracks ? "LOADING..." : "RADIO LETS GO!"}
 </button>
                 </div>
 
