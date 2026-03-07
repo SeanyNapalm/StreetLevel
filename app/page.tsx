@@ -1043,12 +1043,11 @@ async function loadTracks(): Promise<TrackView[]> {
   }
 }
 
-  // ✅ Auto-load when filters change (also re-load when bans change)
+  // Keep URL in sync while filters change, but do NOT auto-hit Supabase
   useEffect(() => {
-    loadTracks();
     syncUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, country, province, city, genre, q, eventShowName, offlineMode, banIds]);
+  }, [date, country, province, city, genre, q, eventShowName, offlineMode]);
 
   // ============== OPTIONS ==============
   const genreOptions = useMemo(() => {
@@ -1071,36 +1070,11 @@ async function loadTracks(): Promise<TrackView[]> {
     return ["", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
   }, [date, eventCityOptions, tracks]);
 
-  // ============== FILTERED LIST ==============
+  // ============== CURRENT PLAYABLE LIST ==============
+  // tracks already represent the LAST successful "RADIO LETS GO" fetch
   const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-    const qqSlug = qq.replace(/\s+/g, "-");
-    const co = country.trim().toLowerCase();
-    const pr = province.trim().toLowerCase();
-    const cc = city.trim().toLowerCase();
-    const gg = genre.trim().toLowerCase();
-
-    const hasFilter = Boolean(qq || co || pr || cc || gg || date.trim());
-    const base = hasFilter
-      ? tracks.filter((t) => {
-          const matchQ =
-            !qq ||
-            t.title.toLowerCase().includes(qq) ||
-            t.band_slug.toLowerCase().includes(qq) ||
-            t.band_slug.toLowerCase().includes(qqSlug);
-
-          const matchCountry = !co || (t.country ?? "").toLowerCase().includes(co);
-          const matchProvince = !pr || (t.province ?? "").toLowerCase().includes(pr);
-          const matchCity = !cc || (t.city ?? "").toLowerCase().includes(cc);
-          const matchGenre = !gg || (t.genre ?? "").toLowerCase().includes(gg);
-
-          return matchQ && matchCountry && matchProvince && matchCity && matchGenre;
-        })
-      : tracks;
-
-    // ✅ extra safety: never include banned
-    return base.filter((t) => !banIds.has(t.id));
-  }, [tracks, q, country, province, city, genre, date, banIds]);
+    return tracks.filter((t) => !banIds.has(t.id));
+  }, [tracks, banIds]);
 
   // Build a fresh shuffled queue whenever the filtered list changes
   useEffect(() => {
@@ -1302,17 +1276,34 @@ async function radioLetsGo() {
   setHasStarted(true);
   closeFilters();
 
-  // loadTracks() now owns the loading state (try/finally inside it)
-  await loadTracks();
+  const loaded = await loadTracks();
+
+  if (!loaded.length) {
+    setQueue([]);
+    setNowPlaying(null);
+    setAutoplayBlocked(false);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    return;
+  }
 
   // credit only when we actually hit the server
   if (!offlineMode) {
     setTimeout(() => {
-      creditAdShareOnce(filtered);
+      creditAdShareOnce(loaded);
     }, 0);
   }
 
-  go();
+  const q2 = shuffle(loaded);
+  const [next, ...rest] = q2;
+
+  setHistory([]);
+  setNowPlaying(next ?? null);
+  setQueue(rest);
+  setAutoplayBlocked(false);
 }
 
   const overlayTitle = useMemo(() => {
@@ -1940,7 +1931,7 @@ function QueueRow({ t }: { t: TrackView }) {
 
 {(() => {
   const bandAvatarUrl = bandHeader?.avatar_path
-    ? withCacheBust(getAvatarUrl(bandHeader.avatar_path))
+    ? getAvatarUrl(bandHeader.avatar_path)
     : "";
 
   const nowImageUrl = eventMode
@@ -1993,7 +1984,7 @@ function QueueRow({ t }: { t: TrackView }) {
       {bandHeader.avatar_path ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={withCacheBust(getAvatarUrl(bandHeader.avatar_path))}
+          src={getAvatarUrl(bandHeader.avatar_path)}
           alt="Band avatar"
           style={{
             width: "100%",
@@ -2656,7 +2647,7 @@ onClick={async () => {
                 const name = normSpaces(ev.note ?? "") || "(Unnamed event)";
                 const meta = `${ev.city ?? "—"}, ${ev.province ?? "—"}, ${ev.country ?? "—"} • ${ev.genre ?? "—"}`;
 
-                const flyer = ev.flyer_path ? withCacheBust(getFlyerUrl(ev.flyer_path)) : "";
+                                const flyer = ev.flyer_path ? getFlyerUrl(ev.flyer_path) : "";
 
                 return (
                   <button
