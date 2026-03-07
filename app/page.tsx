@@ -190,6 +190,8 @@ export default function HomePage() {
   const STREETLEVEL_LOGO = "/StreetLevelLogo-Punk.jpg"; // or png if you prefer
   const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
   const [status, setStatus] = useState("");
+
+  
  
 
   // prevents the "rebuild queue on filtered change" effect from nuking our start
@@ -270,7 +272,12 @@ export default function HomePage() {
   // BANS (user-specific)
   // ==========================
   const [banIds, setBanIds] = useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+
   const banIdsRef = useRef<Set<string>>(new Set());
+
+  
   useEffect(() => {
     banIdsRef.current = banIds;
   }, [banIds]);
@@ -399,11 +406,19 @@ function wireCarPlayHandlers() {
   }
 
   useEffect(() => {
-    // load bans once on mount, and whenever auth state changes
+    async function syncAuth() {
+      const { data } = await supabase.auth.getUser();
+      setCurrentUserId(data?.user?.id ?? null);
+    }
+
+    syncAuth();
     refreshBans();
+
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      syncAuth();
       refreshBans();
     });
+
     return () => {
       sub?.subscription?.unsubscribe();
     };
@@ -418,58 +433,79 @@ function wireCarPlayHandlers() {
   function requestBanNowPlaying() {
     setBanError("");
     if (!nowPlaying) return;
-    setBanConfirmOpen(true);
-  }
 
-  async function confirmBanNowPlaying() {
-    setBanError("");
-    const t = nowPlaying;
-    if (!t) return;
-
-    const { data: auth } = await supabase.auth.getUser();
-    const user = auth?.user;
-
-    if (!user) {
-      setBanConfirmOpen(false);
-      setStatus("Log in to ban songs (bans are saved per user).");
+    if (!currentUserId) {
+      setStatus("Log in to ban songs.");
       return;
     }
 
-    setBanWorking(true);
-    try {
-      const { error } = await supabase.from("user_banned_tracks").insert({
-        user_id: user.id,
-        track_id: t.id,
-      });
-
-      // Unique constraint might throw duplicate; treat as success
-      if (error && !/duplicate|unique/i.test(error.message)) {
-        setBanError(error.message);
-        setBanWorking(false);
-        return;
-      }
-
-      // update local ban set immediately
-      setBanIds((prev) => {
-        const next = new Set(prev);
-        next.add(t.id);
-        return next;
-      });
-
-      // remove from current session queue
-      setQueue((q0) => q0.filter((x) => x.id !== t.id));
-
-      // close modal
-      setBanConfirmOpen(false);
-      setBanWorking(false);
-
-      // skip to next
-      go();
-    } catch (e: any) {
-      setBanError(e?.message ?? "Ban failed.");
-      setBanWorking(false);
-    }
+    setBanConfirmOpen(true);
   }
+
+async function confirmBanNowPlaying() {
+  setBanError("");
+  const t = nowPlaying;
+  if (!t) return;
+
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth?.user;
+
+  if (!user) {
+    setBanConfirmOpen(false);
+    setStatus("Log in to ban songs (bans are saved per user).");
+    return;
+  }
+
+  setBanWorking(true);
+
+  try {
+    const { error } = await supabase
+      .from("user_banned_tracks")
+      .upsert(
+        [{ user_id: user.id, track_id: t.id }],
+        { onConflict: "user_id,track_id" }
+      );
+
+    if (error) {
+      setBanError(error.message);
+      setBanWorking(false);
+      return;
+    }
+
+    const currentId = t.id;
+
+    // optimistic local update
+    setBanIds((prev) => {
+      const next = new Set(prev);
+      next.add(currentId);
+      return next;
+    });
+
+    // remove banned song from queue
+    setQueue((q0) => q0.filter((x) => x.id !== currentId));
+
+    setBanConfirmOpen(false);
+    setBanWorking(false);
+
+    // force immediate skip off the banned track
+    const remainingQueue = queue.filter((x) => x.id !== currentId);
+    const next = remainingQueue[0] ?? null;
+    const rest = remainingQueue.slice(1);
+
+    if (next) {
+      setHistory((h) => [t, ...h].slice(0, 50));
+      setNowPlaying(next);
+      setQueue(rest);
+    } else {
+      setNowPlaying(null);
+      setPendingFreshRound(true);
+      await loadTracks();
+    }
+  } catch (e: any) {
+    setBanError(e?.message ?? "Ban failed.");
+    setBanWorking(false);
+  }
+}
 
   // ✅ pull filters from URL
   useEffect(() => {
@@ -1856,18 +1892,24 @@ function QueueRow({ t }: { t: TrackView }) {
 
   <button
     onClick={requestBanNowPlaying}
+    disabled={!currentUserId}
     style={{
       padding: "10px 12px",
       borderRadius: 12,
       border: "1px solid #ddd",
       fontWeight: 950,
-      background: "white",
-      color: "black",
-      cursor: "pointer",
+      background: currentUserId ? "white" : "#f3f3f3",
+      color: currentUserId ? "black" : "#888",
+      cursor: currentUserId ? "pointer" : "not-allowed",
+      opacity: currentUserId ? 1 : 0.7,
     }}
-    title={`Never play ${nowPlaying.band_slug || "this band"} — ${nowPlaying.title || "this song"} again`}
+    title={
+      currentUserId
+        ? `Never play ${nowPlaying.band_slug || "this band"} — ${nowPlaying.title || "this song"} again`
+        : "Log in to ban songs"
+    }
   >
-    Ban 🚫
+    {currentUserId ? "Ban Song!" : "Log in to ban"}
   </button>
                         </div>
                       </div>
