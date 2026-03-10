@@ -54,7 +54,12 @@ type TrackRow = {
   created_at: string;
 };
 
-type TrackView = TrackRow & { url: string; artUrl: string; flyerUrl?: string };
+type TrackView = TrackRow & {
+  url: string;
+  artUrl: string;
+  avatarUrl: string;
+  flyerUrl?: string;
+};
 
 function getPublicUrl(path: string) {
   const res = supabase.storage.from("tracks").getPublicUrl(path);
@@ -841,6 +846,27 @@ async function loadTracks(): Promise<TrackView[]> {
         if (e.track_id) flyerByTrackId.set(e.track_id, e.flyer_path ?? null);
       }
 
+      const bandSlugs = Array.from(
+        new Set((ts ?? []).map((r: any) => String(r.band_slug ?? "").trim()).filter(Boolean))
+      );
+
+      let avatarBySlug = new Map<string, string>();
+
+      if (bandSlugs.length) {
+        const { data: bandRows } = await supabase
+          .from("band_users")
+          .select("band_slug, avatar_path")
+          .in("band_slug", bandSlugs)
+          .order("user_id", { ascending: true });
+
+        avatarBySlug = new Map<string, string>();
+        for (const b of bandRows ?? []) {
+          const slug = String((b as any).band_slug ?? "").trim();
+          if (!slug || avatarBySlug.has(slug)) continue;
+          avatarBySlug.set(slug, getAvatarUrl((b as any).avatar_path ?? null));
+        }
+      }
+
       const mappedRaw: TrackView[] = (ts ?? []).map((r: TrackRow) => {
         const flyerPath = flyerByTrackId.get(r.id) ?? null;
         const flyerUrl = flyerPath ? withCacheBust(getFlyerUrl(flyerPath)) : "";
@@ -848,6 +874,7 @@ async function loadTracks(): Promise<TrackView[]> {
           ...r,
           url: getPublicUrl(r.file_path),
           artUrl: getArtworkUrl(r.art_path),
+          avatarUrl: avatarBySlug.get(r.band_slug) ?? "",
           flyerUrl,
         };
       });
@@ -957,10 +984,13 @@ async function loadTracks(): Promise<TrackView[]> {
           return [];
         }
 
+        const bandAvatarUrl = bh?.avatar_path ? getAvatarUrl(bh.avatar_path) : "";
+
         const mappedAllRaw: TrackView[] = (all ?? []).map((r: TrackRow) => ({
           ...r,
           url: getPublicUrl(r.file_path),
           artUrl: getArtworkUrl(r.art_path),
+          avatarUrl: bandAvatarUrl,
           flyerUrl: "",
         }));
 
@@ -1016,10 +1046,32 @@ async function loadTracks(): Promise<TrackView[]> {
       return [];
     }
 
+    const bandSlugs = Array.from(
+      new Set((data ?? []).map((r: any) => String(r.band_slug ?? "").trim()).filter(Boolean))
+    );
+
+    let avatarBySlug = new Map<string, string>();
+
+    if (bandSlugs.length) {
+      const { data: bandRows } = await supabase
+        .from("band_users")
+        .select("band_slug, avatar_path")
+        .in("band_slug", bandSlugs)
+        .order("user_id", { ascending: true });
+
+      avatarBySlug = new Map<string, string>();
+      for (const b of bandRows ?? []) {
+        const slug = String((b as any).band_slug ?? "").trim();
+        if (!slug || avatarBySlug.has(slug)) continue;
+        avatarBySlug.set(slug, getAvatarUrl((b as any).avatar_path ?? null));
+      }
+    }
+
     const mappedRaw: TrackView[] = (data ?? []).map((r: TrackRow) => ({
       ...r,
       url: getPublicUrl(r.file_path),
       artUrl: getArtworkUrl(r.art_path),
+      avatarUrl: avatarBySlug.get(r.band_slug) ?? "",
       flyerUrl: "",
     }));
 
@@ -1419,7 +1471,7 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
     else closeRow();
   }
 
-  const thumb = eventMode ? (t.flyerUrl || t.artUrl) : t.artUrl;
+    const thumb = eventMode ? (t.flyerUrl || t.avatarUrl || t.artUrl) : (t.avatarUrl || t.artUrl);
 
   // ✅ Desktop: no swipe, simple buttons
   if (!swipeEnabled) {
@@ -1952,10 +2004,11 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
     : "";
 
   const nowImageUrl = eventMode
-    ? (nowPlaying.flyerUrl || nowPlaying.artUrl)
-    : (bandAvatarUrl || nowPlaying.artUrl);
+    ? (nowPlaying.flyerUrl || nowPlaying.avatarUrl || bandAvatarUrl || nowPlaying.artUrl)
+    : (nowPlaying.avatarUrl || bandAvatarUrl || nowPlaying.artUrl);
 
   return nowImageUrl ? (
+
     // eslint-disable-next-line @next/next/no-img-element
 <img
   src={nowImageUrl}

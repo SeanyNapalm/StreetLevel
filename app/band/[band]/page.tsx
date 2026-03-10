@@ -1500,18 +1500,16 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 <input
   ref={audioInputRef}
   type="file"
-  accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus"
+  accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/flac,audio/ogg,audio/opus"
   multiple
   style={{ display: "none" }}
   onChange={(e) => {
-    // ✅ copy to a normal array FIRST (FileList can get wiped when you clear value)
     const picked = Array.from(e.currentTarget.files ?? []);
-    e.currentTarget.value = ""; // allow re-picking same files later
-
+    e.currentTarget.value = "";
     if (picked.length === 0) return;
 
     setStatus(`Picked ${picked.length} file(s)`);
-    onUpload(picked); // ✅ pass array
+    onUpload(picked);
   }}
 />
 
