@@ -251,6 +251,18 @@ export default function HomePage() {
     historyRef.current = history;
   }, [history]);
 
+  // ✅ refs so MediaSession handlers always see latest state
+  const nowPlayingRef = useRef<TrackView | null>(null);
+  const queueRef = useRef<TrackView[]>([]);
+
+  useEffect(() => {
+    nowPlayingRef.current = nowPlaying;
+  }, [nowPlaying]);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
 
   // Autoplay
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -297,7 +309,7 @@ export default function HomePage() {
 
 
 
-  function setCarPlayNowPlaying(t: TrackView | null) {
+function setCarPlayNowPlaying(t: TrackView | null) {
   if (typeof window === "undefined") return;
 
   const ms: any = (navigator as any).mediaSession;
@@ -308,76 +320,117 @@ export default function HomePage() {
     ms.metadata = new MM({
       title: "StreetLevel",
       artist: "",
-      album: "",
-      artwork: [{ src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" }],
+      album: "StreetLevel",
+      artwork: [
+        { src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" },
+      ],
     });
+
+    try {
+      ms.playbackState = "none";
+    } catch {}
+
     return;
   }
 
-  // what we want CarPlay to show:
-  // artwork = StreetLevel logo (stable / always shows)
-  // title = song title
-  // artist = band slug (or display name if you ever add it to TrackRow later)
+  const artworkSrc =
+    t.avatarUrl ||
+    t.artUrl ||
+    t.flyerUrl ||
+    STREETLEVEL_LOGO;
+
   ms.metadata = new MM({
     title: t.title || "Untitled",
     artist: t.band_slug || "StreetLevel",
     album: "StreetLevel",
-    artwork: [{ src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" }],
+    artwork: [
+      { src: artworkSrc, sizes: "512x512", type: "image/jpeg" },
+      { src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" },
+    ],
   });
+
+  try {
+    ms.playbackState = "playing";
+  } catch {}
 }
 
 function wireCarPlayHandlers() {
   const ms: any = (navigator as any).mediaSession;
   if (!ms?.setActionHandler) return;
 
-  // NEXT button (steering wheel / CarPlay)
-  ms.setActionHandler("nexttrack", () => {
-    go(); // ✅ your existing behavior
-  });
+  try {
+    ms.setActionHandler("play", async () => {
+      const el = audioRef.current;
+      if (!el) return;
+      try {
+        await el.play();
+      } catch {}
+    });
+  } catch {}
 
-  // PREV button: restart if >3s, else go previous track
-  ms.setActionHandler("previoustrack", () => {
-    const el = audioRef.current;
-    const t = nowPlaying;
+  try {
+    ms.setActionHandler("pause", () => {
+      const el = audioRef.current;
+      if (!el) return;
+      el.pause();
+    });
+  } catch {}
 
-    if (!t || !el) return;
+  try {
+    ms.setActionHandler("nexttrack", () => {
+      go();
+    });
+  } catch {}
 
-    if (el.currentTime > 3) {
-      el.currentTime = 0; // restart current song
-      el.play?.().catch(() => {});
-      return;
-    }
+  try {
+    ms.setActionHandler("previoustrack", async () => {
+      const el = audioRef.current;
+      const current = nowPlayingRef.current;
 
-    // otherwise go to previous track if we have it
-    const h = historyRef.current;
-    const prev = h[0];
-    if (!prev) {
-      // nothing in history -> just restart
-      el.currentTime = 0;
-      el.play?.().catch(() => {});
-      return;
-    }
+      if (!el || !current) return;
 
-    // remove prev from history and push current back onto queue front
-    setHistory((hh) => hh.slice(1));
-    setQueue((q0) => (t ? [t, ...q0] : q0));
-    setNowPlaying(prev);
-  });
+      if (el.currentTime > 3) {
+        el.currentTime = 0;
+        try {
+          await el.play();
+        } catch {}
+        return;
+      }
 
-  // Optional: seek buttons if the car exposes them
-  ms.setActionHandler("seekbackward", (details: any) => {
-    const el = audioRef.current;
-    if (!el) return;
-    const s = details?.seekOffset ?? 10;
-    el.currentTime = Math.max(0, el.currentTime - s);
-  });
+      const h = historyRef.current;
+      const prev = h[0];
 
-  ms.setActionHandler("seekforward", (details: any) => {
-    const el = audioRef.current;
-    if (!el) return;
-    const s = details?.seekOffset ?? 10;
-    el.currentTime = Math.min(el.duration || Infinity, el.currentTime + s);
-  });
+      if (!prev) {
+        el.currentTime = 0;
+        try {
+          await el.play();
+        } catch {}
+        return;
+      }
+
+      setHistory((hh) => hh.slice(1));
+      setQueue((q0) => [current, ...q0]);
+      setNowPlaying(prev);
+    });
+  } catch {}
+
+  try {
+    ms.setActionHandler("seekbackward", (details: any) => {
+      const el = audioRef.current;
+      if (!el) return;
+      const s = details?.seekOffset ?? 10;
+      el.currentTime = Math.max(0, el.currentTime - s);
+    });
+  } catch {}
+
+  try {
+    ms.setActionHandler("seekforward", (details: any) => {
+      const el = audioRef.current;
+      if (!el) return;
+      const s = details?.seekOffset ?? 10;
+      el.currentTime = Math.min(el.duration || Infinity, el.currentTime + s);
+    });
+  } catch {}
 }
 
 
@@ -1201,7 +1254,10 @@ useEffect(() => {
 
   // Try to start audio whenever nowPlaying changes
   useEffect(() => {
-    if (!nowPlaying) return;
+    if (!nowPlaying) {
+      setCarPlayNowPlaying(null);
+      return;
+    }
 
     setCarPlayNowPlaying(nowPlaying);
     setAutoplayBlocked(false);
@@ -1976,19 +2032,35 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
 
                       {nowPlaying.url ? (
                         <div style={{ paddingTop: 6 }}>
-                          <audio
-                            ref={audioRef}
-                            key={nowPlaying.id}
-                            controls
-                            autoPlay
-                            src={nowPlaying.url}
-                            style={{
-                              width: "100%",
-                              height: 46,
-                            }}
-                            onEnded={onEndedAdvance}
-                            onPlay={() => setAutoplayBlocked(false)}
-                          />
+<audio
+  ref={audioRef}
+  key={nowPlaying.id}
+  controls
+  autoPlay
+  src={nowPlaying.url}
+  style={{
+    width: "100%",
+    height: 46,
+  }}
+  onEnded={onEndedAdvance}
+  onPlay={() => {
+    setAutoplayBlocked(false);
+    const ms: any = (navigator as any).mediaSession;
+    if (ms) {
+      try {
+        ms.playbackState = "playing";
+      } catch {}
+    }
+  }}
+  onPause={() => {
+    const ms: any = (navigator as any).mediaSession;
+    if (ms) {
+      try {
+        ms.playbackState = "paused";
+      } catch {}
+    }
+  }}
+/>
                         </div>
                       ) : null}
 
