@@ -1944,7 +1944,7 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
               style={{
                 marginTop: 18,
                 display: "grid",
-                gridTemplateColumns: isNarrow ? "1fr" : "360px 1fr",
+                gridTemplateColumns: isNarrow ? "1fr" : "clamp(360px, 38vw, 560px) 1fr",
                 gap: 14,
                 alignItems: "start",
               }}
@@ -2092,13 +2092,15 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
   alt={bandHeader ? "Band avatar" : "Now playing artwork"}
   style={{
     width: "100%",
+    maxWidth: "100%",
     aspectRatio: "1 / 1",
-    objectFit: "contain",          // ✅ key change: no crop
+    objectFit: "contain",
     borderRadius: 16,
     border: "1px solid #eee",
     marginTop: 8,
-    background: "#f6f6f6",         // ✅ makes the empty space look nice
+    background: "#f6f6f6",
     display: "block",
+    marginInline: "auto",
   }}
 />
   ) : null;
