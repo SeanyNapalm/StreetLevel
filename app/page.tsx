@@ -305,12 +305,14 @@ export default function HomePage() {
   }, [banIds]);
 
 
-  useEffect(() => {
+useEffect(() => {
   wireCarPlayHandlers();
-  // set a baseline metadata so logo shows even before first play
-  setCarPlayNowPlaying(null);
+
+  if (!nowPlayingRef.current) {
+    setCarPlayNowPlaying(null);
+  }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+}, [nowPlaying, queue]);
 
 
 
@@ -382,8 +384,29 @@ function wireCarPlayHandlers() {
   } catch {}
 
   try {
-    ms.setActionHandler("nexttrack", () => {
-      goRef.current?.();
+    ms.setActionHandler("nexttrack", async () => {
+      const el = audioRef.current;
+      const current = nowPlayingRef.current;
+      const q = queueRef.current;
+
+      if (!current && !q.length) return;
+
+      // if we have future songs queued, use them directly
+      if (q.length > 0) {
+        const next = q[0];
+        const rest = q.slice(1);
+
+        if (current) {
+          setHistory((h) => [current, ...h].slice(0, 50));
+        }
+
+        setNowPlaying(next);
+        setQueue(rest);
+        return;
+      }
+
+      // if queue empty, fall back to normal app logic
+      await goRef.current?.();
     });
   } catch {}
 
@@ -1441,7 +1464,7 @@ async function radioLetsGo() {
     return "StreetLevel.live";
   }, [date]);
 
-  const mainMaxWidth = 1000;
+  const mainMaxWidth = 1900;
 
   // ============================
   // Queue Row (Swipe-to-remove)
