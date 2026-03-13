@@ -254,6 +254,7 @@ export default function HomePage() {
   // ✅ refs so MediaSession handlers always see latest state
   const nowPlayingRef = useRef<TrackView | null>(null);
   const queueRef = useRef<TrackView[]>([]);
+  const goRef = useRef<() => void | Promise<void>>(() => {});
 
   useEffect(() => {
     nowPlayingRef.current = nowPlaying;
@@ -262,6 +263,10 @@ export default function HomePage() {
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+
+  useEffect(() => {
+    goRef.current = go;
+  }, [go]);
 
 
   // Autoplay
@@ -378,7 +383,7 @@ function wireCarPlayHandlers() {
 
   try {
     ms.setActionHandler("nexttrack", () => {
-      go();
+      goRef.current?.();
     });
   } catch {}
 
