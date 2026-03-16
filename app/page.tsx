@@ -252,22 +252,62 @@ export default function HomePage() {
   }, [history]);
 
   // ✅ refs so MediaSession handlers always see latest state
-  const nowPlayingRef = useRef<TrackView | null>(null);
-  const queueRef = useRef<TrackView[]>([]);
-  const goRef = useRef<() => void | Promise<void>>(() => {});
+const nowPlayingRef = useRef<TrackView | null>(null);
+const queueRef = useRef<TrackView[]>([]);
+const futureSongsRef = useRef<TrackView[]>([]);
+const goRef = useRef<() => void | Promise<void>>(() => {});
 
   useEffect(() => {
     nowPlayingRef.current = nowPlaying;
   }, [nowPlaying]);
 
-  useEffect(() => {
-    queueRef.current = queue;
-  }, [queue]);
+useEffect(() => {
+  queueRef.current = queue;
+  futureSongsRef.current = queue;
+}, [queue]);
 
-  useEffect(() => {
-    goRef.current = go;
-  }, [go]);
+useEffect(() => {
+  goRef.current = advanceToNextTrack;
+});
 
+
+  async function advanceToNextTrack() {
+  const current = nowPlayingRef.current;
+  const future = futureSongsRef.current;
+
+  // exact same idea as history, but forward
+  if (future.length > 0) {
+    const next = future[0];
+    const rest = future.slice(1);
+
+    if (current) {
+      setHistory((h) => [current, ...h].slice(0, 50));
+    }
+
+    setNowPlaying(next);
+    setQueue(rest);
+    return;
+  }
+
+  // no future songs left
+  if (offlineMode) {
+    if (!filtered.length) return;
+
+    const q2 = shuffle(filtered);
+    const [next, ...rest] = q2;
+
+    if (current) {
+      setHistory((h) => [current, ...h].slice(0, 50));
+    }
+
+    setNowPlaying(next ?? null);
+    setQueue(rest);
+    return;
+  }
+
+  setPendingFreshRound(true);
+  await loadTracks();
+}
 
   // Autoplay
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -383,32 +423,11 @@ function wireCarPlayHandlers() {
     });
   } catch {}
 
-  try {
-    ms.setActionHandler("nexttrack", async () => {
-      const el = audioRef.current;
-      const current = nowPlayingRef.current;
-      const q = queueRef.current;
-
-      if (!current && !q.length) return;
-
-      // if we have future songs queued, use them directly
-      if (q.length > 0) {
-        const next = q[0];
-        const rest = q.slice(1);
-
-        if (current) {
-          setHistory((h) => [current, ...h].slice(0, 50));
-        }
-
-        setNowPlaying(next);
-        setQueue(rest);
-        return;
-      }
-
-      // if queue empty, fall back to normal app logic
-      await goRef.current?.();
-    });
-  } catch {}
+try {
+  ms.setActionHandler("nexttrack", async () => {
+    await advanceToNextTrack();
+  });
+} catch {}
 
   try {
     ms.setActionHandler("previoustrack", async () => {
@@ -1306,33 +1325,7 @@ useEffect(() => {
 
 async function go() {
   if (!filtered.length) return;
-
-  // If queue empty, either reshuffle offline or reload online
-  if (!queue.length) {
-    if (offlineMode) {
-      const q2 = shuffle(filtered);
-      const [next, ...rest] = q2;
-
-      // ✅ history push
-      if (nowPlaying) setHistory((h) => [nowPlaying, ...h].slice(0, 50));
-
-      setNowPlaying(next ?? null);
-      setQueue(rest);
-      return;
-    }
-
-    setPendingFreshRound(true);
-    await loadTracks();
-    return;
-  }
-
-  const [next, ...rest] = queue;
-
-  // ✅ history push
-  if (nowPlaying) setHistory((h) => [nowPlaying, ...h].slice(0, 50));
-
-  setNowPlaying(next);
-  setQueue(rest);
+  await advanceToNextTrack();
 }
 
 function playTrack(t: TrackView) {
