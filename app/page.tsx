@@ -192,7 +192,7 @@ const CITIES_BY_PROVINCE: Record<string, string[]> = {
 type WhereStep = "country" | "province" | "city";
 
 export default function HomePage() {
-  const STREETLEVEL_LOGO = "/StreetLevelLogo-Punk.jpg"; // or png if you prefer
+  const STREETLEVEL_LOGO = "/StreetLevelLogo(Punk).png"; // or png if you prefer
   const [bandHeader, setBandHeader] = useState<BandHeader | null>(null);
   const [status, setStatus] = useState("");
 
@@ -356,6 +356,29 @@ useEffect(() => {
 
 
 
+function guessImageType(src: string) {
+  const clean = (src || "").split("?")[0].toLowerCase();
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".webp")) return "image/webp";
+  if (clean.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
+function makeArtworkSet(src: string) {
+  const type = guessImageType(src);
+
+  // Give the system multiple size hints for the SAME image.
+  // Safari / CarPlay may pick the entry it likes best.
+  return [
+    { src, sizes: "96x96", type },
+    { src, sizes: "128x128", type },
+    { src, sizes: "192x192", type },
+    { src, sizes: "256x256", type },
+    { src, sizes: "384x384", type },
+    { src, sizes: "512x512", type },
+  ];
+}
+
 function setCarPlayNowPlaying(t: TrackView | null) {
   if (typeof window === "undefined") return;
 
@@ -363,14 +386,14 @@ function setCarPlayNowPlaying(t: TrackView | null) {
   const MM: any = (window as any).MediaMetadata;
   if (!ms || !MM) return;
 
+  const fallbackArtwork = makeArtworkSet(STREETLEVEL_LOGO);
+
   if (!t) {
     ms.metadata = new MM({
       title: "StreetLevel",
       artist: "",
       album: "StreetLevel",
-      artwork: [
-        { src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" },
-      ],
+      artwork: fallbackArtwork,
     });
 
     try {
@@ -391,8 +414,8 @@ function setCarPlayNowPlaying(t: TrackView | null) {
     artist: t.band_slug || "StreetLevel",
     album: "StreetLevel",
     artwork: [
-      { src: artworkSrc, sizes: "512x512", type: "image/jpeg" },
-      { src: STREETLEVEL_LOGO, sizes: "512x512", type: "image/jpeg" },
+      ...makeArtworkSet(artworkSrc),
+      ...fallbackArtwork,
     ],
   });
 
