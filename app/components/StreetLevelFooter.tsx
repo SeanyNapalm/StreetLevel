@@ -1,25 +1,18 @@
 import Image from "next/image";
-
-function toSmsHref(num: string) {
-  const cleaned = (num || "").replace(/[^\d+]/g, "");
-  const normalized =
-    cleaned.length === 10 ? `+1${cleaned}` : cleaned.startsWith("+") ? cleaned : `+${cleaned}`;
-  return `sms:${normalized}`;
-}
+import Link from "next/link";
 
 export default function StreetLevelFooter() {
   const year = new Date().getFullYear();
-
-  const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "admin@streetlevel.live";
-  const smsNumber = process.env.NEXT_PUBLIC_CONTACT_SMS || "6137999532";
+  const email = "seanynapalm@streetlevel.live";
 
   return (
     <footer
       style={{
-        marginTop: 18,
-        borderTop: "1px solid #eee",
-        paddingTop: 14,
-        paddingBottom: 16,
+        marginTop: 28,
+        borderTop: "1px solid #e5e5e5",
+        paddingTop: 18,
+        paddingBottom: 20,
+        background: "#a5a5a541", // 👈 light gray (clean + safe for adsense)
       }}
     >
       <div
@@ -27,52 +20,96 @@ export default function StreetLevelFooter() {
           maxWidth: 1100,
           margin: "0 auto",
           padding: "0 18px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          flexWrap: "wrap",
+          display: "grid",
+          gap: 14,
+          justifyItems: "center",
         }}
       >
-        {/* Pic */}
+        {/* LINKS + CONTACT */}
         <div
           style={{
-            width: 49,
-            height: 49,
-            borderRadius: 999,
-            overflow: "hidden",
-            border: "1px solid #eee",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+            fontSize: 14,
+            textAlign: "center",
           }}
         >
-          <Image
-            src="/seanynapalm.jpg"
-            alt="Seany Napalm"
-            width={38}
-            height={38}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
+          <Link href="/about" style={{ fontWeight: 800, textDecoration: "underline", color: "black" }}>
+            About StreetLevel
+          </Link>
+
+          <span>|</span>
+
+          <Link href="/FAQ" style={{ fontWeight: 800, textDecoration: "underline", color: "black" }}>
+            FAQ
+          </Link>
+
+          <span>|</span>
+
+          <Link href="/privacy" style={{ fontWeight: 800, textDecoration: "underline", color: "black" }}>
+            Privacy
+          </Link>
+
+          <span>|</span>
+
+          <Link href="/terms" style={{ fontWeight: 800, textDecoration: "underline", color: "black" }}>
+            Terms
+          </Link>
+
+          <span>|</span>
+
+          {/* CONTACT INLINE */}
+          <span style={{ fontWeight: 800 }}>Contact me:</span>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <div
+              style={{
+                width: 39,
+                height: 39,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: "1px solid #ddd",
+              }}
+            >
+              <Image
+                src="/seanynapalm.jpg"
+                alt="Seany Napalm"
+                width={39}
+                height={39}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+
+            <a
+              href={`mailto:${email}?subject=StreetLevel`}
+              style={{
+                fontWeight: 900,
+                textDecoration: "underline",
+                color: "black",
+              }}
+            >
+              {email}
+            </a>
+          </div>
         </div>
 
-        {/* Inline Contact Line */}
-        <div style={{ fontSize: 14 }}>
-          <a
-            href={`mailto:${email}`}
-            style={{ fontWeight: 900, textDecoration: "underline", color: "black" }}
-          >
-            Email me
-          </a>{" "}
-          or{" "}
-          <a
-            href={toSmsHref(smsNumber)}
-            style={{ fontWeight: 900, textDecoration: "underline", color: "black" }}
-          >
-            Text me
-          </a>{" "}
-          if you have any issues!
-        </div>
-
-        {/* Copyright */}
-        <div style={{ fontSize: 12, opacity: 0.55, whiteSpace: "nowrap" }}>
+        {/* COPYRIGHT */}
+        <div
+          style={{
+            fontSize: 12,
+            opacity: 0.6,
+            textAlign: "center",
+          }}
+        >
           © {year} StreetLevel
         </div>
       </div>

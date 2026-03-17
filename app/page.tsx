@@ -364,36 +364,31 @@ function guessImageType(src: string) {
   return "image/jpeg";
 }
 
-function makeArtworkSet(src: string) {
-  const type = guessImageType(src);
-
-  // Give the system multiple size hints for the SAME image.
-  // Safari / CarPlay may pick the entry it likes best.
-  return [
-    { src, sizes: "96x96", type },
-    { src, sizes: "128x128", type },
-    { src, sizes: "192x192", type },
-    { src, sizes: "256x256", type },
-    { src, sizes: "384x384", type },
-    { src, sizes: "512x512", type },
-  ];
+function toAbsoluteUrl(src: string) {
+  if (!src) return "";
+  if (src.startsWith("http://") || src.startsWith("https://")) return src;
+  if (typeof window !== "undefined") return new URL(src, window.location.origin).toString();
+  return src;
 }
 
 function setCarPlayNowPlaying(t: TrackView | null) {
   if (typeof window === "undefined") return;
+  if (!("mediaSession" in navigator)) return;
+  if (typeof MediaMetadata === "undefined") return;
 
   const ms: any = (navigator as any).mediaSession;
-  const MM: any = (window as any).MediaMetadata;
-  if (!ms || !MM) return;
 
-  const fallbackArtwork = makeArtworkSet(STREETLEVEL_LOGO);
+  const logoSrc = toAbsoluteUrl(STREETLEVEL_LOGO);
+  const logoType = guessImageType(logoSrc);
 
   if (!t) {
-    ms.metadata = new MM({
+    ms.metadata = new MediaMetadata({
       title: "StreetLevel",
-      artist: "",
+      artist: "StreetLevel",
       album: "StreetLevel",
-      artwork: fallbackArtwork,
+      artwork: [
+        { src: logoSrc, sizes: "512x512", type: logoType },
+      ],
     });
 
     try {
@@ -403,19 +398,22 @@ function setCarPlayNowPlaying(t: TrackView | null) {
     return;
   }
 
-  const artworkSrc =
+  const rawArtworkSrc =
     t.avatarUrl ||
     t.artUrl ||
     t.flyerUrl ||
     STREETLEVEL_LOGO;
 
-  ms.metadata = new MM({
+  const artworkSrc = toAbsoluteUrl(rawArtworkSrc);
+  const artworkType = guessImageType(artworkSrc);
+
+  ms.metadata = new MediaMetadata({
     title: t.title || "Untitled",
     artist: t.band_slug || "StreetLevel",
     album: "StreetLevel",
     artwork: [
-      ...makeArtworkSet(artworkSrc),
-      ...fallbackArtwork,
+      { src: artworkSrc, sizes: "512x512", type: artworkType },
+      { src: logoSrc, sizes: "512x512", type: logoType },
     ],
   });
 
