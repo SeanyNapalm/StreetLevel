@@ -176,62 +176,59 @@ export default function FAQPage() {
 
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "110px minmax(0, 1fr)",
-              gap: 14,
-              alignItems: "stretch",
+              fontSize: 16,
+              lineHeight: 1.7,
+              border: "1px solid rgba(0,0,0,0.08)",
+              borderRadius: 14,
+              padding: 16,
+              background: "rgba(0,0,0,0.02)",
+            }}
+          >
+            <strong>ME! Seany Napalm!</strong> I am a "musician" lol. I built this because it's
+            something I wanted! Something I would love to use. I wanted to showcase bands you
+            haven't heard of, let them be heard!
+
+            <br />
+            <br />
+
+            I wanted Facebook events to have one easy link to a playlist that plays a song from
+            each band. Put event link under an instagram post about an event, add link to a flyer! 
+            Hear every band on the event with one click! I wanted touring bands and promoters to get a chance to hear the local
+            talent, to choose the perfect artists for their events.
+
+            <br />
+            <br />
+
+            I wanted artists to actually get <strong>PAID</strong> when people listen to their
+            tunes, instead of Spotify, where you need thousands of listens just to break even.
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
             }}
           >
             <div
               style={{
+                width: "min(260px, 100%)",
                 borderRadius: 14,
                 overflow: "hidden",
                 border: "1px solid rgba(0,0,0,0.10)",
-                minHeight: "100%",
-                height: "100%",
                 background: "#f6f6f6",
               }}
             >
               <Image
                 src="/seanynapalm.jpg"
                 alt="Seany Napalm"
-                width={220}
-                height={220}
+                width={260}
+                height={320}
                 style={{
                   width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
+                  height: "auto",
                   display: "block",
                 }}
               />
-            </div>
-
-            <div
-              style={{
-                fontSize: 16,
-                lineHeight: 1.7,
-                border: "1px solid rgba(0,0,0,0.08)",
-                borderRadius: 14,
-                padding: 16,
-                background: "rgba(0,0,0,0.02)",
-              }}
-            >
-              <strong>ME! Seany Napalm!</strong> I am a "musician" lol. I built this because it's
-              something I wanted! Something I would love to use. I wanted to showcase bands you
-              haven't heard of, let them be heard!
-
-              <br />
-              <br />
-
-              I wanted Facebook events to have one easy link to a playlist that plays a song from
-              each band. I wanted touring bands and promoters to get a chance to hear the local
-              talent, to choose the perfect artists for their events.
-
-              <br />
-              <br />
-
-              I wanted artists to actually get <strong>PAID</strong> when people listen to their
-              tunes, instead of Spotify, where you need thousands of listens just to break even.
             </div>
           </div>
         </section>
