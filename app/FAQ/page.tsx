@@ -192,7 +192,7 @@ export default function FAQPage() {
             <br />
 
             I wanted Facebook events to have one easy link to a playlist that plays a song from
-            each band. Put event link under an instagram post about an event, add link to a flyer! 
+            each band. Put the event link under an instagram post about a show, or add link to a flyer! 
             Hear every band on the event with one click! I wanted touring bands and promoters to get a chance to hear the local
             talent, to choose the perfect artists for their events.
 
