@@ -62,7 +62,7 @@ export default function StreetLevelFooter() {
           <span>|</span>
 
           {/* CONTACT INLINE */}
-          <span style={{ fontWeight: 800 }}>Contact me:</span>
+          <span style={{ fontWeight: 800 }}>Contact:</span>
 
           <div
             style={{

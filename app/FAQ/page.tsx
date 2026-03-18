@@ -193,7 +193,7 @@ export default function FAQPage() {
               }}
             >
               <Image
-                src="/seanynapalm.jpg"
+                src="/Kim-N-A-Sean.jpg"
                 alt="Seany Napalm"
                 width={220}
                 height={220}
