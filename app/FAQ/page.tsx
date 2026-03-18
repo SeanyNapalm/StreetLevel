@@ -177,7 +177,7 @@ export default function FAQPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "315px minmax(0, 1fr)",
+              gridTemplateColumns: "110px minmax(0, 1fr)",
               gap: 14,
               alignItems: "stretch",
             }}
@@ -193,7 +193,7 @@ export default function FAQPage() {
               }}
             >
               <Image
-                src="/Kim-N-A-Sean.jpg"
+                src="/seanynapalm.jpg"
                 alt="Seany Napalm"
                 width={220}
                 height={220}
