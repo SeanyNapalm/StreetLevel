@@ -524,11 +524,19 @@ async function checkForExistingShow(date: string) {
         return;
       }
 
-      const ok = file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/webp";
-      if (!ok) {
-        setStatus("Avatar must be PNG, JPG, or WEBP.");
-        return;
-      }
+const ok = file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/webp";
+if (!ok) {
+  setStatus("Avatar must be PNG, JPG, or WEBP.");
+  return;
+}
+
+const MAX_AVATAR_MB = 3;
+const MAX_AVATAR_BYTES = MAX_AVATAR_MB * 1024 * 1024;
+
+if (file.size > MAX_AVATAR_BYTES) {
+  setStatus(`Avatar too large. Max size is ${MAX_AVATAR_MB} MB.`);
+  return;
+}
 
       setAvatarUploading(true);
       setStatus("Uploading profile pic...");
@@ -1215,9 +1223,9 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
                 />
               </label>
 
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                PNG/JPG/WEBP • square works best {profileLoading ? " • loading..." : ""}
-              </div>
+<div style={{ fontSize: 12, opacity: 0.7 }}>
+  PNG/JPG/WEBP • max 3 MB • square works best {profileLoading ? " • loading..." : ""}
+</div>
             </div>
           </section>
 

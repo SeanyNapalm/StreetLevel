@@ -383,19 +383,28 @@ function setCarPlayNowPlaying(t: TrackView | null) {
   const logoSrc = toAbsoluteUrl(STREETLEVEL_LOGO);
   const logoType = guessImageType(logoSrc);
 
+  function buildArtworkSet(src: string, type: string) {
+    return [
+      { src, sizes: "96x96", type },
+      { src, sizes: "128x128", type },
+      { src, sizes: "192x192", type },
+      { src, sizes: "256x256", type },
+      { src, sizes: "384x384", type },
+      { src, sizes: "512x512", type },
+    ];
+  }
+
   if (!t) {
     ms.metadata = new MediaMetadata({
       title: "StreetLevel",
       artist: "StreetLevel",
       album: "StreetLevel",
-      artwork: [
-        { src: logoSrc, sizes: "512x512", type: logoType },
-      ],
+      artwork: buildArtworkSet(logoSrc, logoType),
     });
 
-try {
-  ms.playbackState = "paused";
-} catch {}
+    try {
+      ms.playbackState = "paused";
+    } catch {}
 
     return;
   }
@@ -414,8 +423,8 @@ try {
     artist: t.band_slug || "StreetLevel",
     album: "StreetLevel",
     artwork: [
-      { src: artworkSrc, sizes: "512x512", type: artworkType },
-      { src: logoSrc, sizes: "512x512", type: logoType },
+      ...buildArtworkSet(artworkSrc, artworkType),
+      ...buildArtworkSet(logoSrc, logoType),
     ],
   });
 
