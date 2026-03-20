@@ -272,6 +272,8 @@ useEffect(() => {
 
 
   async function advanceToNextTrack() {
+  setCarPlayNowPlaying(null);
+
   const current = nowPlayingRef.current;
   const future = futureSongsRef.current;
 
@@ -391,9 +393,9 @@ function setCarPlayNowPlaying(t: TrackView | null) {
       ],
     });
 
-    try {
-      ms.playbackState = "none";
-    } catch {}
+try {
+  ms.playbackState = "paused";
+} catch {}
 
     return;
   }
@@ -1369,9 +1371,10 @@ function playTrack(t: TrackView) {
   });
 }
 
-  function onEndedAdvance() {
-    go();
-  }
+function onEndedAdvance() {
+  setCarPlayNowPlaying(null); // show StreetLevel logo/metadata during transition
+  go();
+}
 
   // ✅ Swipe remove from queue (session-only)
   function removeFromQueue(trackId: string) {
