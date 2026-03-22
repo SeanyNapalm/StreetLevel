@@ -2346,13 +2346,6 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
                 StreetLevel picks one song per band for the queue, so bands with 50 songs do not get more airtime than bands with 5.
               </div>
 
-              <div>
-                If you hear something you hate, hit <b>Ban Song</b> and never hear it again.
-              </div>
-
-              <div>
-                If you discover a band you love, open their band page, support them, or search their name in Radio Setup to hear all their songs.
-              </div>
             </div>
           </div>
 
