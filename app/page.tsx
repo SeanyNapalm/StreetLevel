@@ -650,6 +650,16 @@ async function confirmBanNowPlaying() {
 
     const url = new URL(window.location.href);
 
+    const shouldOpenSetup = url.searchParams.get("setup") === "1";
+
+if (shouldOpenSetup) {
+  setHasStarted(true);
+  setFiltersOpen(true);
+
+  // optional: clean URL so refresh doesn’t keep forcing it
+  window.history.replaceState({}, "", "/");
+}
+
     const co = url.searchParams.get("country") ?? "";
     const pr = url.searchParams.get("province") ?? "";
     const ci = url.searchParams.get("city") ?? "";
@@ -1921,71 +1931,84 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
         <div style={{ padding: 18 }}>
           <div style={{ maxWidth: mainMaxWidth, margin: "0 auto" }}>
             <StreetLevelHeader
-              left={
-                <button
-                  onClick={go}
-                  disabled={!filtered.length || isLoadingTracks}
-                  style={{
-                    padding: "12px 16px",
-                    borderRadius: 12,
-                    border: "1px solid #ddd",
-                    fontWeight: 950,
-                    background: "black",
-                    color: "#2bff00",
-                    opacity: filtered.length && !isLoadingTracks ? 1 : 0.45,
-                    cursor: filtered.length && !isLoadingTracks ? "pointer" : "not-allowed",
-                    whiteSpace: "nowrap",
-                  }}
-                  title="Play / Next"
-                >
-                  Play / Next
-                </button>
-              }
-              leftSub={
-                <>
-                  Songs in queue: <b>{queue.length}</b>
-                  {status ? <> • {status}</> : null}
-                </>
-              }
-              right={
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-<button
-  onClick={openFilters}
-  style={{
-    padding: "12px 16px",
-    borderRadius: 12,
-    border: "1px solid #ddd",
-    fontWeight: 950,
-    background: "black",
-    color: "white",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-    animation: shouldPulseSetupButton ? "slPulse 1.3s ease-in-out infinite" : "none",
-    boxShadow: shouldPulseSetupButton ? "0 0 0 rgba(43,255,0,0.0)" : "none",
-  }}
-  title="Open radio setup"
->
-  Radio Setup
-</button>
+left={
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+      gap: 10,
+      width: "min(520px, 100%)",
+      margin: "0 auto",
+    }}
+  >
 
-                  <Link
-                    href="/band"
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: 12,
-                      border: "1px solid #ddd",
-                      textDecoration: "none",
-                      fontWeight: 950,
-                      whiteSpace: "nowrap",
-                      background: "black",
-                      color: "white",
-                      display: "inline-block",
-                    }}
-                  >
-                    Log in
-                  </Link>
-                </div>
-              }
+    <button
+      onClick={openFilters}
+      style={{
+        width: "100%",
+        padding: "12px 16px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        fontWeight: 950,
+        background: "black",
+        color: "white",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        animation: shouldPulseSetupButton ? "slPulse 1.3s ease-in-out infinite" : "none",
+        boxShadow: shouldPulseSetupButton ? "0 0 0 rgba(43,255,0,0.0)" : "none",
+      }}
+      title="Open radio setup"
+    >
+      Radio Setup
+    </button>
+
+
+
+    <button
+      onClick={go}
+      disabled={!filtered.length || isLoadingTracks}
+      style={{
+        width: "100%",
+        padding: "12px 16px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        fontWeight: 950,
+        background: "black",
+        color: "#2bff00",
+        opacity: filtered.length && !isLoadingTracks ? 1 : 0.45,
+        cursor: filtered.length && !isLoadingTracks ? "pointer" : "not-allowed",
+        whiteSpace: "nowrap",
+      }}
+      title="Play / Next"
+    >
+      Play / Next
+    </button>
+
+
+
+    <Link
+      href="/band"
+      style={{
+        width: "100%",
+        padding: "12px 16px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        textDecoration: "none",
+        fontWeight: 950,
+        whiteSpace: "nowrap",
+        background: "black",
+        color: "white",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxSizing: "border-box",
+      }}
+    >
+      Log in
+    </Link>
+  </div>
+}
+right={null}
             />
 
             {/* Event mode note */}

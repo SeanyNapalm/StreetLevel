@@ -1098,7 +1098,7 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
           left={
             <>
               <button
-                onClick={() => (window.location.href = "/")}
+                onClick={() => (window.location.href = "/?setup=1")}
                 style={{
                   padding: "12px 16px",
                   borderRadius: 12,
