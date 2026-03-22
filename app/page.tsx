@@ -2297,9 +2297,6 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
             local shows, and the songs that get shoved to the bottom by the mainstream machine.
           </div>
 
-          <div>
-            It brings the underground up from beneath your feet and puts it right in your speakers.
-          </div>
         </div>
       </div>
 
