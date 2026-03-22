@@ -317,7 +317,7 @@ useEffect(() => {
   const autoStartAfterEventPickRef = useRef(false);
 
   // UI
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
 
   // Splash
@@ -1490,6 +1490,11 @@ async function radioLetsGo() {
     return "StreetLevel.live";
   }, [date]);
 
+ 
+  const shouldPulseSetupButton = queue.length === 0 && !nowPlaying;
+  const showWelcomeContent = queue.length === 0 && !nowPlaying && !bandHeader;
+
+
   const mainMaxWidth = 1900;
 
   // ============================
@@ -1944,22 +1949,24 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
               }
               right={
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <button
-                    onClick={openFilters}
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: 12,
-                      border: "1px solid #ddd",
-                      fontWeight: 950,
-                      background: "black",
-                      color: "white",
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                    title="Open filters"
-                  >
-                    Filters
-                  </button>
+<button
+  onClick={openFilters}
+  style={{
+    padding: "12px 16px",
+    borderRadius: 12,
+    border: "1px solid #ddd",
+    fontWeight: 950,
+    background: "black",
+    color: "white",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    animation: shouldPulseSetupButton ? "slPulse 1.3s ease-in-out infinite" : "none",
+    boxShadow: shouldPulseSetupButton ? "0 0 0 rgba(43,255,0,0.0)" : "none",
+  }}
+  title="Open radio setup"
+>
+  Radio Setup
+</button>
 
                   <Link
                     href="/band"
@@ -2238,12 +2245,147 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
 )}
               </div>
 
-              {/* RIGHT: Queue */}
-              <section style={{ display: "grid", gap: 8 }}>
-                {queue.map((t) => (
-                  <QueueRow key={t.id} t={t} />
-                ))}
-              </section>
+{/* RIGHT: Queue / Welcome */}
+<section style={{ display: "grid", gap: 12 }}>
+  {showWelcomeContent ? (
+    <section
+      style={{
+        border: "1px solid #eee",
+        borderRadius: 18,
+        padding: 18,
+        display: "grid",
+        gap: 16,
+        background: "white",
+      }}
+    >
+      <div style={{ display: "grid", gap: 10 }}>
+        <div
+          style={{
+            fontSize: 12,
+            opacity: 0.7,
+            letterSpacing: 0.7,
+            fontWeight: 900,
+            textTransform: "uppercase",
+          }}
+        >
+          StreetLevel
+        </div>
+
+        <div
+          style={{
+            fontSize: 28,
+            fontWeight: 950,
+            lineHeight: 1.08,
+            maxWidth: 900,
+          }}
+        >
+          Cranking the tunes so loud you hear it on the street. From the underground beneath your feet.
+        </div>
+
+        <div
+          style={{
+            fontSize: 15,
+            lineHeight: 1.65,
+            opacity: 0.82,
+            maxWidth: 900,
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <div>
+            StreetLevel is a city-first underground music platform built to help people discover local bands,
+            local shows, and the songs that get shoved to the bottom by the mainstream machine.
+          </div>
+
+          <div>
+            It brings the underground up from beneath your feet and puts it right in your speakers.
+          </div>
+        </div>
+      </div>
+
+      <section
+        style={{
+          border: "1px solid #eee",
+          borderRadius: 16,
+          padding: 16,
+          display: "grid",
+          gap: 14,
+          background: "#fafafa",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 20,
+            fontWeight: 950,
+            lineHeight: 1.15,
+          }}
+        >
+          Getting Started
+        </div>
+
+        <div style={{ display: "grid", gap: 14 }}>
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
+              1. Open Radio Setup
+            </div>
+
+            <div style={{ fontSize: 15, lineHeight: 1.65, display: "grid", gap: 8 }}>
+              <div>
+                Choose how specific you want your playlist to be.
+              </div>
+
+              <div>
+                Start the radio with no filters at all, and you’ll hear one song from every band on the entire platform.
+              </div>
+
+              <div>
+                Add a city, country, genre, band, or event name to narrow the playlist and aim it where you want.
+              </div>
+
+              <div>
+                StreetLevel picks one song per band for the queue, so bands with 50 songs do not get more airtime than bands with 5.
+              </div>
+
+              <div>
+                If you hear something you hate, hit <b>Ban Song</b> and never hear it again.
+              </div>
+
+              <div>
+                If you discover a band you love, open their band page, support them, or search their name in Radio Setup to hear all their songs.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
+              2. Smash RADIO LETS GO!
+            </div>
+
+            <div style={{ fontSize: 15, lineHeight: 1.65 }}>
+              That builds your queue based on whatever setup you chose.
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
+              3. Use Play / Next
+            </div>
+
+            <div style={{ fontSize: 15, lineHeight: 1.65 }}>
+              Start your playlist, skip forward, and keep the underground rolling.
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  ) : (
+    <>
+      {queue.map((t) => (
+        <QueueRow key={t.id} t={t} />
+      ))}
+    </>
+  )}
+</section>
             </div>
           </div>
         </div>
@@ -2910,6 +3052,26 @@ onClick={async () => {
           </div>
         </div>
       ) : null}
+
+
+<style>{`
+  @keyframes slPulse {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(43,255,0,0.45);
+    }
+    50% {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 12px rgba(43,255,0,0);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(43,255,0,0);
+    }
+  }
+`}</style>
+
+
 
       <StreetLevelFooter />
     </main>
