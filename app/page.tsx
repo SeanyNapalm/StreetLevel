@@ -2423,11 +2423,11 @@ right={null}
 
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
-              2. Hit "Radio Lets Go" to get the tunes going!
+              2. Hit "Radio Lets Go" to get the music rolling!
             </div>
 
             <div style={{ fontSize: 15, lineHeight: 1.65 }}>
-              That builds your queue based on whatever setup you chose.
+              That builds your playlist based on whatever specifics you chose.
             </div>
           </div>
 
