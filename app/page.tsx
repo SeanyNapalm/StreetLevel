@@ -59,6 +59,8 @@ type TrackView = TrackRow & {
   artUrl: string;
   avatarUrl: string;
   flyerUrl?: string;
+  bandDisplayName?: string;
+  bandName?: string;
 };
 
 function getPublicUrl(path: string) {
@@ -420,7 +422,7 @@ function setCarPlayNowPlaying(t: TrackView | null) {
 
   ms.metadata = new MediaMetadata({
     title: t.title || "Untitled",
-    artist: t.band_slug || "StreetLevel",
+    artist: t.bandDisplayName || t.bandName || t.band_slug || "StreetLevel",
     album: "StreetLevel",
     artwork: [
       ...buildArtworkSet(artworkSrc, artworkType),
@@ -992,34 +994,52 @@ async function loadTracks(): Promise<TrackView[]> {
         new Set((ts ?? []).map((r: any) => String(r.band_slug ?? "").trim()).filter(Boolean))
       );
 
-      let avatarBySlug = new Map<string, string>();
+let avatarBySlug = new Map<string, string>();
+let displayNameBySlug = new Map<string, string>();
+let bandNameBySlug = new Map<string, string>();
 
-      if (bandSlugs.length) {
-        const { data: bandRows } = await supabase
-          .from("band_users")
-          .select("band_slug, avatar_path")
-          .in("band_slug", bandSlugs)
-          .order("user_id", { ascending: true });
+if (bandSlugs.length) {
+  const { data: bandRows } = await supabase
+    .from("band_users")
+    .select("band_slug, avatar_path, display_name, band_name")
+    .in("band_slug", bandSlugs)
+    .order("user_id", { ascending: true });
 
-        avatarBySlug = new Map<string, string>();
-        for (const b of bandRows ?? []) {
-          const slug = String((b as any).band_slug ?? "").trim();
-          if (!slug || avatarBySlug.has(slug)) continue;
-          avatarBySlug.set(slug, getAvatarUrl((b as any).avatar_path ?? null));
-        }
+  avatarBySlug = new Map<string, string>();
+  displayNameBySlug = new Map<string, string>();
+  bandNameBySlug = new Map<string, string>();
+
+for (const b of bandRows ?? []) {
+  const slug = String((b as any).band_slug ?? "").trim();
+  if (!slug) continue;
+
+  if (!avatarBySlug.has(slug)) {
+    avatarBySlug.set(slug, getAvatarUrl((b as any).avatar_path ?? null));
+  }
+
+  if (!displayNameBySlug.has(slug)) {
+    displayNameBySlug.set(slug, String((b as any).display_name ?? "").trim());
+  }
+
+  if (!bandNameBySlug.has(slug)) {
+    bandNameBySlug.set(slug, String((b as any).band_name ?? "").trim());
+  }
+}
       }
 
-      const mappedRaw: TrackView[] = (ts ?? []).map((r: TrackRow) => {
-        const flyerPath = flyerByTrackId.get(r.id) ?? null;
-        const flyerUrl = flyerPath ? withCacheBust(getFlyerUrl(flyerPath)) : "";
-        return {
-          ...r,
-          url: getPublicUrl(r.file_path),
-          artUrl: getArtworkUrl(r.art_path),
-          avatarUrl: avatarBySlug.get(r.band_slug) ?? "",
-          flyerUrl,
-        };
-      });
+const mappedRaw: TrackView[] = (ts ?? []).map((r: TrackRow) => {
+  const flyerPath = flyerByTrackId.get(r.id) ?? null;
+  const flyerUrl = flyerPath ? withCacheBust(getFlyerUrl(flyerPath)) : "";
+  return {
+    ...r,
+    url: getPublicUrl(r.file_path),
+    artUrl: getArtworkUrl(r.art_path),
+    avatarUrl: avatarBySlug.get(r.band_slug) ?? "",
+    flyerUrl,
+    bandDisplayName: displayNameBySlug.get(r.band_slug) ?? "",
+    bandName: bandNameBySlug.get(r.band_slug) ?? "",
+  };
+});
 
       // ✅ filter out banned
       const mapped = mappedRaw.filter((t) => !banIdsRef.current.has(t.id));
@@ -1128,13 +1148,15 @@ async function loadTracks(): Promise<TrackView[]> {
 
         const bandAvatarUrl = bh?.avatar_path ? getAvatarUrl(bh.avatar_path) : "";
 
-        const mappedAllRaw: TrackView[] = (all ?? []).map((r: TrackRow) => ({
-          ...r,
-          url: getPublicUrl(r.file_path),
-          artUrl: getArtworkUrl(r.art_path),
-          avatarUrl: bandAvatarUrl,
-          flyerUrl: "",
-        }));
+const mappedAllRaw: TrackView[] = (all ?? []).map((r: TrackRow) => ({
+  ...r,
+  url: getPublicUrl(r.file_path),
+  artUrl: getArtworkUrl(r.art_path),
+  avatarUrl: bandAvatarUrl,
+  flyerUrl: "",
+  bandDisplayName: bh?.display_name ?? "",
+  bandName: bh?.band_name ?? "",
+}));
 
         const mappedAll = mappedAllRaw.filter((t) => !banIdsRef.current.has(t.id));
 
@@ -1192,30 +1214,48 @@ async function loadTracks(): Promise<TrackView[]> {
       new Set((data ?? []).map((r: any) => String(r.band_slug ?? "").trim()).filter(Boolean))
     );
 
-    let avatarBySlug = new Map<string, string>();
+let avatarBySlug = new Map<string, string>();
+let displayNameBySlug = new Map<string, string>();
+let bandNameBySlug = new Map<string, string>();
 
-    if (bandSlugs.length) {
-      const { data: bandRows } = await supabase
-        .from("band_users")
-        .select("band_slug, avatar_path")
-        .in("band_slug", bandSlugs)
-        .order("user_id", { ascending: true });
+if (bandSlugs.length) {
+  const { data: bandRows } = await supabase
+    .from("band_users")
+    .select("band_slug, avatar_path, display_name, band_name")
+    .in("band_slug", bandSlugs)
+    .order("user_id", { ascending: true });
 
-      avatarBySlug = new Map<string, string>();
-      for (const b of bandRows ?? []) {
-        const slug = String((b as any).band_slug ?? "").trim();
-        if (!slug || avatarBySlug.has(slug)) continue;
-        avatarBySlug.set(slug, getAvatarUrl((b as any).avatar_path ?? null));
-      }
+  avatarBySlug = new Map<string, string>();
+  displayNameBySlug = new Map<string, string>();
+  bandNameBySlug = new Map<string, string>();
+
+for (const b of bandRows ?? []) {
+  const slug = String((b as any).band_slug ?? "").trim();
+  if (!slug) continue;
+
+  if (!avatarBySlug.has(slug)) {
+    avatarBySlug.set(slug, getAvatarUrl((b as any).avatar_path ?? null));
+  }
+
+  if (!displayNameBySlug.has(slug)) {
+    displayNameBySlug.set(slug, String((b as any).display_name ?? "").trim());
+  }
+
+  if (!bandNameBySlug.has(slug)) {
+    bandNameBySlug.set(slug, String((b as any).band_name ?? "").trim());
+  }
+}
     }
 
-    const mappedRaw: TrackView[] = (data ?? []).map((r: TrackRow) => ({
-      ...r,
-      url: getPublicUrl(r.file_path),
-      artUrl: getArtworkUrl(r.art_path),
-      avatarUrl: avatarBySlug.get(r.band_slug) ?? "",
-      flyerUrl: "",
-    }));
+const mappedRaw: TrackView[] = (data ?? []).map((r: TrackRow) => ({
+  ...r,
+  url: getPublicUrl(r.file_path),
+  artUrl: getArtworkUrl(r.art_path),
+  avatarUrl: avatarBySlug.get(r.band_slug) ?? "",
+  flyerUrl: "",
+  bandDisplayName: displayNameBySlug.get(r.band_slug) ?? "",
+  bandName: bandNameBySlug.get(r.band_slug) ?? "",
+}));
 
     const mapped = mappedRaw.filter((t) => !banIdsRef.current.has(t.id));
 
@@ -1669,7 +1709,7 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
                 textOverflow: "ellipsis",
               }}
             >
-              {t.city} • {t.genre} • {t.band_slug}
+              {t.city} • {t.genre} • {t.bandDisplayName || t.bandName || t.band_slug}
             </div>
           </div>
         </Link>
@@ -1832,7 +1872,7 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
                 textOverflow: "ellipsis",
               }}
             >
-              {t.city} • {t.genre} • {t.band_slug}
+              {t.city} • {t.genre} • {t.bandDisplayName || t.bandName || t.band_slug}
             </div>
           </div>
         </Link>
@@ -2055,36 +2095,96 @@ right={null}
 </div>
 
                     <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-                      <div style={{ display: "grid", gap: 6 }}>
-                      <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1.1 }}>
-  {bandHeader
-    ? (bandHeader.display_name || bandHeader.band_name || bandHeader.band_slug)
-    : (nowPlaying.title || "Untitled")}
-</div>
 
-{bandHeader ? (
-  <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
-    Now playing: <b>{nowPlaying.title || "Untitled"}</b>
+
+<div style={{ display: "grid", gap: 10, padding: 14 }}>
+  <div style={{ display: "grid", gap: 8 }}>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "baseline",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 900,
+          letterSpacing: 0.6,
+          opacity: 0.7,
+          textTransform: "uppercase",
+          flexShrink: 0,
+        }}
+      >
+        Song:
+      </div>
+      <div
+        style={{
+          fontSize: 28,
+          fontWeight: 950,
+          lineHeight: 1.05,
+          wordBreak: "break-word",
+        }}
+      >
+        {nowPlaying.title || "Untitled"}
+      </div>
+    </div>
+
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "baseline",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 900,
+          letterSpacing: 0.6,
+          opacity: 0.7,
+          textTransform: "uppercase",
+          flexShrink: 0,
+        }}
+      >
+        Band:
+      </div>
+      <div
+        style={{
+          fontSize: 28,
+          fontWeight: 950,
+          lineHeight: 1.05,
+          wordBreak: "break-word",
+        }}
+      >
+{bandHeader
+  ? (bandHeader.display_name || bandHeader.band_name || bandHeader.band_slug)
+  : (nowPlaying.bandDisplayName || nowPlaying.bandName || nowPlaying.band_slug || "Unknown Band")}
+      </div>
+    </div>
+
+    <div
+      style={{
+        fontSize: 12,
+        opacity: 0.65,
+        lineHeight: 1.3,
+      }}
+    >
+      {bandHeader ? (
+        <>
+          {(bandHeader.city || "—")} • {(bandHeader.genre || "—")}
+        </>
+      ) : (
+        <>
+          {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")}
+        </>
+      )}
+    </div>
   </div>
-) : null}
 
-<div style={{ fontSize: 12, opacity: 0.75 }}>
-  {bandHeader ? (
-    <>
-      {(bandHeader.genre || "—")} • {(bandHeader.city || "—")}
-      {bandHeader.province ? `, ${bandHeader.province}` : ""}
-      {bandHeader.country ? `, ${bandHeader.country}` : ""}
-      {" • "}
-      {(bandHeader.band_slug || "—")}
-    </>
-  ) : (
-    <>
-      {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")} • {(nowPlaying.band_slug || "—")}
-    </>
-  )}
-</div>
-
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                           <Link
                             href={`/b/${nowPlaying.band_slug}`}
                             style={{
