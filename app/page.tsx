@@ -2142,19 +2142,19 @@ right={null}
       <div
         style={{
           fontSize: 12,
-          fontWeight: 900,
+          fontWeight: 700,
           letterSpacing: 0.6,
           opacity: 0.7,
           textTransform: "uppercase",
           flexShrink: 0,
         }}
       >
-        Band:
+        By:
       </div>
       <div
         style={{
-          fontSize: 28,
-          fontWeight: 950,
+          fontSize: 19,
+          fontWeight: 850,
           lineHeight: 1.05,
           wordBreak: "break-word",
         }}
