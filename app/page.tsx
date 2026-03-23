@@ -2032,7 +2032,7 @@ left={
         color: "white",
         cursor: "pointer",
         whiteSpace: "nowrap",
-        animation: shouldPulseSetupButton ? "slPulse 1.3s ease-in-out infinite" : "none",
+        animation: shouldPulseSetupButton ? "slPulse 1s cubic-bezier(0.4, 0, 0.2, 1) infinite" : "none",
         boxShadow: shouldPulseSetupButton ? "0 0 0 rgba(43,255,0,0.0)" : "none",
       }}
       title="Open radio setup"
@@ -3261,20 +3261,41 @@ onClick={async () => {
 
 
 <style>{`
-  @keyframes slPulse {
-    0% {
-      transform: scale(1);
-      box-shadow: 0 0 0 0 rgba(43,255,0,0.45);
-    }
-    50% {
-      transform: scale(1.06);
-      box-shadow: 0 0 0 12px rgba(43,255,0,0);
-    }
-    100% {
-      transform: scale(1);
-      box-shadow: 0 0 0 0 rgba(43,255,0,0);
-    }
+@keyframes slPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(43, 255, 0, 0.0);
+    transform: scale(1);
+    background: black;
+    color: white;
   }
+
+  30% {
+    box-shadow: 0 0 25px 6px rgba(43, 255, 0, 0.9);
+    transform: scale(1.08);
+    background: #0a0a0a;
+    color: #2bff00;
+  }
+
+  60% {
+    box-shadow: 0 0 35px 10px rgba(43, 255, 0, 1);
+    transform: scale(1.12);
+    background: #111;
+    color: #2bff00;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(43, 255, 0, 0.0);
+    transform: scale(1);
+    background: black;
+    color: white;
+  }
+}
+
+@keyframes slWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(1deg); }
+  75% { transform: rotate(-1deg); }
+}
 `}</style>
 
 
