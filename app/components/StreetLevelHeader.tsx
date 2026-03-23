@@ -43,7 +43,7 @@ export default function StreetLevelHeader({
         style={{
           display: "grid",
           gap: 12,
-          marginBottom: 18,
+          marginBottom: 0,
         }}
       >
         {/* LOGO (always visible, never squeezed) */}

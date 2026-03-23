@@ -2019,15 +2019,15 @@ right={null}
             ) : null}
 
             {/* ===== MAIN LAYOUT ===== */}
-            <div
-              style={{
-                marginTop: 18,
-                display: "grid",
-                gridTemplateColumns: isNarrow ? "1fr" : "clamp(360px, 38vw, 560px) 1fr",
-                gap: 14,
-                alignItems: "start",
-              }}
-            >
+<div
+  style={{
+    marginTop: 0,
+    display: "grid",
+    gridTemplateColumns: isNarrow ? "1fr" : "clamp(360px, 38vw, 560px) 1fr",
+    gap: 14,
+    alignItems: "start",
+  }}
+>
               {/* LEFT: Now Playing */}
               <div>
                 {nowPlaying ? (
@@ -2035,12 +2035,24 @@ right={null}
                     style={{
                       border: "1px solid #eee",
                       borderRadius: 18,
-                      padding: 14,
+                      padding: 0,
+                      overflow: "hidden",
                     }}
                   >
-                    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
-                      NOW PLAYING
-                    </div>
+<div
+  style={{
+    background: "black",
+    color: "#2bff00",
+    textAlign: "center",
+    fontWeight: 950,
+    fontSize: 13,
+    letterSpacing: 1,
+    padding: "8px 10px",
+    borderRadius: 10,
+  }}
+>
+  NOW PLAYING
+</div>
 
                     <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                       <div style={{ display: "grid", gap: 6 }}>
@@ -2250,26 +2262,66 @@ right={null}
     </div>
   </section>
 ) : (
-  <section
+<section
+  style={{
+    display: "grid",
+    gap: 12,
+  }}
+>
+  <div
+    style={{
+      background: "black",
+      color: "#2bff00",
+      textAlign: "center",
+      fontWeight: 950,
+      fontSize: 13,
+      letterSpacing: 1,
+      padding: "8px 10px",
+      borderRadius: 12,
+    }}
+  >
+    NOW PLAYING
+  </div>
+
+  <div
     style={{
       border: "1px solid #eee",
       borderRadius: 18,
       padding: 14,
+      background: "white",
     }}
   >
-    <div style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.7, fontWeight: 900 }}>
-      NOW PLAYING
+    <div style={{ fontWeight: 950, lineHeight: 1.2 }}>
+      Nothing playing yet. 
     </div>
-    <div style={{ marginTop: 10, fontWeight: 950, lineHeight: 1.2 }}>Nothing playing yet.</div>
-    <div style={{ marginTop: 6, fontSize: 13, opacity: 0.7 }}>
-      Hit <b>Play / Next</b> or open <b>Filters</b> and smash <b>RADIO LETS GO</b>.
+
+     <div style={{ fontWeight: 650, lineHeight: 1.2 }}>
+        Hit "Radio Setup" to get started!
     </div>
-  </section>
+
+  </div>
+</section>
 )}
               </div>
 
 {/* RIGHT: Queue / Welcome */}
 <section style={{ display: "grid", gap: 12 }}>
+
+<div
+  style={{
+    background: "black",
+    color: "#2bff00",
+    textAlign: "center",
+    fontWeight: 950,
+    fontSize: 13,
+    letterSpacing: 1,
+    padding: "8px 10px",
+    borderRadius: 9,
+  }}
+>
+  NEXT SONGS
+</div>
+
   {showWelcomeContent ? (
     <section
       style={{
