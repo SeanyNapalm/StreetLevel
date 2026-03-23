@@ -19,6 +19,7 @@ type BandHeader = {
   province: string | null;
   city: string | null;
   genre: string | null;
+  sub_genre: string | null;
   bio: string | null;
 };
 
@@ -31,6 +32,7 @@ type EventRow = {
 
   city: string | null;
   genre: string | null;
+  sub_genre: string | null;
   show_date: string; // "YYYY-MM-DD"
   note: string | null; // event name
   flyer_path: string | null;
@@ -47,6 +49,7 @@ type TrackRow = {
 
   city: string;
   genre: string;
+  sub_genre: string | null;
   is_radio: boolean;
   band_slug: string;
   file_path: string;
@@ -192,6 +195,28 @@ const CITIES_BY_PROVINCE: Record<string, string[]> = {
 };
 
 type WhereStep = "country" | "province" | "city";
+
+const GENRE_OPTIONS = [
+  "Punk",
+  "Metal",
+  "Hardcore",
+  "Rock",
+  "Hip-Hop",
+  "Rap",
+  "Pop",
+  "Indie",
+  "Alternative",
+  "Grunge",
+  "Ska",
+  "Reggae",
+  "Electronic",
+  "Folk",
+  "Country",
+  "Blues",
+  "Jazz",
+  "Experimental",
+  "Other",
+] as const;
 
 export default function HomePage() {
   const STREETLEVEL_LOGO = "/StreetLevelLogo(Punk).png"; // or png if you prefer
@@ -974,10 +999,10 @@ async function loadTracks(): Promise<TrackView[]> {
         return [];
       }
 
-      const { data: ts, error: tErr } = await supabase
-        .from("tracks")
-        .select("id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,created_at")
-        .in("id", trackIds);
+const { data: ts, error: tErr } = await supabase
+  .from("tracks")
+  .select("id,title,country,province,city,genre,sub_genre,is_radio,band_slug,file_path,art_path,created_at")
+  .in("id", trackIds);
 
       if (tErr) {
         setStatus(`Tracks load error: ${tErr.message}`);
@@ -1124,21 +1149,21 @@ const mappedRaw: TrackView[] = (ts ?? []).map((r: TrackRow) => {
 
       if (matchedSlug) {
         // ✅ load band header/profile for the UI
-        const { data: bh } = await supabase
-          .from("band_users")
-          .select("band_slug, band_name, display_name, avatar_path, country, province, city, genre, bio")
-          .eq("band_slug", matchedSlug)
-          .order("user_id", { ascending: true })
-          .limit(1)
-          .maybeSingle();
+const { data: bh } = await supabase
+  .from("band_users")
+  .select("band_slug, band_name, display_name, avatar_path, country, province, city, genre, sub_genre, bio")
+  .eq("band_slug", matchedSlug)
+  .order("user_id", { ascending: true })
+  .limit(1)
+  .maybeSingle();
 
         setBandHeader((bh as any) ?? { band_slug: matchedSlug });
 
-        const { data: all, error: allErr } = await supabase
-          .from("tracks")
-          .select("id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,created_at")
-          .eq("band_slug", matchedSlug)
-          .order("created_at", { ascending: false });
+const { data: all, error: allErr } = await supabase
+  .from("tracks")
+  .select("id,title,country,province,city,genre,sub_genre,is_radio,band_slug,file_path,art_path,created_at")
+  .eq("band_slug", matchedSlug)
+  .order("created_at", { ascending: false });
 
         if (allErr) {
           setStatus(`Band tracks load error: ${allErr.message}`);
@@ -1284,15 +1309,28 @@ const mappedRaw: TrackView[] = (data ?? []).map((r: TrackRow) => ({
   }, [date, country, province, city, genre, q, eventShowName, offlineMode]);
 
   // ============== OPTIONS ==============
-  const genreOptions = useMemo(() => {
-    if (date) return ["", ...eventGenreOptions];
+const genreOptions = useMemo(() => {
+  if (date) return ["", ...eventGenreOptions];
 
-    const s = new Set(masterGenres.map((x) => norm(x)).filter(Boolean));
-    const current = norm(genre);
-    if (current) s.add(current);
+  const s = new Set<string>();
 
-    return ["", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
-  }, [date, eventGenreOptions, masterGenres, genre]);
+  // ✅ ALWAYS include base genres
+  for (const g of GENRE_OPTIONS) {
+    s.add(g);
+  }
+
+  // ✅ add any genres discovered from tracks
+  for (const g of masterGenres) {
+    const clean = norm(g);
+    if (clean) s.add(clean);
+  }
+
+  // ✅ keep current selection if custom
+  const current = norm(genre);
+  if (current) s.add(current);
+
+  return ["", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
+}, [date, eventGenreOptions, masterGenres, genre]);
 
   const cityOptions = useMemo(() => {
     if (date) return ["", ...eventCityOptions];
@@ -1709,7 +1747,7 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
                 textOverflow: "ellipsis",
               }}
             >
-              {t.city} • {t.genre} • {t.bandDisplayName || t.bandName || t.band_slug}
+              {t.city} • {t.genre}{t.sub_genre ? ` → ${t.sub_genre}` : ""} • {t.bandDisplayName || t.bandName || t.band_slug}
             </div>
           </div>
         </Link>
@@ -1872,7 +1910,7 @@ const QueueRow = memo(function QueueRow({ t }: { t: TrackView }) {
                 textOverflow: "ellipsis",
               }}
             >
-              {t.city} • {t.genre} • {t.bandDisplayName || t.bandName || t.band_slug}
+              {t.city} • {t.genre}{t.sub_genre ? ` → ${t.sub_genre}` : ""} • {t.bandDisplayName || t.bandName || t.band_slug}
             </div>
           </div>
         </Link>
@@ -2171,15 +2209,17 @@ right={null}
         lineHeight: 1.3,
       }}
     >
-      {bandHeader ? (
-        <>
-          {(bandHeader.city || "—")} • {(bandHeader.genre || "—")}
-        </>
-      ) : (
-        <>
-          {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")}
-        </>
-      )}
+{bandHeader ? (
+  <>
+    {(bandHeader.city || "—")} • {(bandHeader.genre || "—")}
+    {bandHeader.sub_genre ? ` → ${bandHeader.sub_genre}` : ""}
+  </>
+) : (
+  <>
+    {(nowPlaying.city || "—")} • {(nowPlaying.genre || "—")}
+    {nowPlaying.sub_genre ? ` → ${nowPlaying.sub_genre}` : ""}
+  </>
+)}
     </div>
   </div>
 
@@ -2315,7 +2355,9 @@ right={null}
       </div>
 
       <div style={{ fontSize: 12, opacity: 0.75 }}>
-        {(bandHeader.genre || "—")} • {(bandHeader.city || "—")}
+        {(bandHeader.genre || "—")}
+{bandHeader.sub_genre ? ` → ${bandHeader.sub_genre}` : ""}
+ • {(bandHeader.city || "—")}
         {bandHeader.province ? `, ${bandHeader.province}` : ""}
         {bandHeader.country ? `, ${bandHeader.country}` : ""} • {bandHeader.band_slug}
       </div>
