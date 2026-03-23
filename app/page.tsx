@@ -1959,7 +1959,7 @@ left={
       }}
       title="Open radio setup"
     >
-      Radio Setup
+        Setup
     </button>
 
 
@@ -2296,7 +2296,7 @@ right={null}
     </div>
 
      <div style={{ fontWeight: 650, lineHeight: 1.2 }}>
-        Hit "Radio Setup" to get started!
+        Hit "Setup" to get started!
     </div>
 
   </div>
@@ -2354,7 +2354,7 @@ right={null}
             maxWidth: 900,
           }}
         >
-          Cranking the tunes so loud you hear it on the street. From the underground beneath your feet.
+          From the underground up to your Street.
         </div>
 
         <div
@@ -2369,7 +2369,7 @@ right={null}
         >
           <div>
             StreetLevel is a city-first underground music platform built to help people discover local bands,
-            local shows, and the songs that get shoved to the bottom by the mainstream machine.
+            shows, and the songs that get shoved to the bottom by the mainstream machine.
           </div>
 
         </div>
@@ -2398,7 +2398,7 @@ right={null}
         <div style={{ display: "grid", gap: 14 }}>
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
-              1. Open Radio Setup
+              1. Open Setup
             </div>
 
             <div style={{ fontSize: 15, lineHeight: 1.65, display: "grid", gap: 8 }}>
@@ -2423,7 +2423,7 @@ right={null}
 
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
-              2. Smash RADIO LETS GO!
+              2. Hit "Radio Lets Go" to get the tunes going!
             </div>
 
             <div style={{ fontSize: 15, lineHeight: 1.65 }}>
