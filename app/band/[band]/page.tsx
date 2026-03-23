@@ -39,7 +39,7 @@
 
     // keep genre on the track for now
     genre: string;
-
+    sub_genre: string | null;
     is_radio: boolean;
     band_slug: string;
     file_path: string | null;
@@ -50,20 +50,43 @@
 
   type TrackView = TrackRow & { url: string; artUrl: string };
 
-  type BandUserProfileRow = {
-    user_id: string;
-    band_slug: string;
-    band_name: string | null;
-    display_name: string | null;
+type BandUserProfileRow = {
+  user_id: string;
+  band_slug: string;
+  band_name: string | null;
+  display_name: string | null;
 
-    country: string | null;
-    province: string | null;
-    genre: string | null;
+  country: string | null;
+  province: string | null;
+  genre: string | null;
+  sub_genre: string | null;
 
-    city: string | null;
-    bio: string | null;
-    avatar_path: string | null;
-  };
+  city: string | null;
+  bio: string | null;
+  avatar_path: string | null;
+};
+
+const GENRE_OPTIONS = [
+  "Punk",
+  "Metal",
+  "Hardcore",
+  "Rock",
+  "Hip-Hop",
+  "Rap",
+  "Pop",
+  "Indie",
+  "Alternative",
+  "Grunge",
+  "Ska",
+  "Reggae",
+  "Electronic",
+  "Folk",
+  "Country",
+  "Blues",
+  "Jazz",
+  "Experimental",
+  "Other",
+] as const;
 
   type GalleryItem = {
     path: string;
@@ -168,15 +191,16 @@
     const [eventStatus, setEventStatus] = useState<string>("");
     const [uploading, setUploading] = useState(false);
 
-    // Track editing (ONLY: title, price, radio, artwork, genre)
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editTitle, setEditTitle] = useState("");
-    const [editGenre, setEditGenre] = useState("");
-    const [editRadio, setEditRadio] = useState(true);
-    const [editPrice, setEditPrice] = useState("1.00");
+// Track editing (ONLY: title, price, radio, artwork, genre, sub genre)
+const [editingId, setEditingId] = useState<string | null>(null);
+const [editTitle, setEditTitle] = useState("");
+const [editGenre, setEditGenre] = useState("");
+const [editSubGenre, setEditSubGenre] = useState("");
+const [editRadio, setEditRadio] = useState(true);
+const [editPrice, setEditPrice] = useState("1.00");
 
-    const [editArtPreview, setEditArtPreview] = useState<string>("");
-    const [artUploading, setArtUploading] = useState(false);
+const [editArtPreview, setEditArtPreview] = useState<string>("");
+const [artUploading, setArtUploading] = useState(false);
 
     const [nowPlaying, setNowPlaying] = useState<TrackView | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
@@ -192,13 +216,15 @@
     const [profileSaving, setProfileSaving] = useState(false);
     const [avatarUploading, setAvatarUploading] = useState(false);
 
-    const [profileName, setProfileName] = useState("");
-    const [profileCountry, setProfileCountry] = useState("Canada");
-    const [profileProvince, setProfileProvince] = useState("Ontario");
-    const [profileGenre, setProfileGenre] = useState("Punk");
-    const [profileCity, setProfileCity] = useState("Ottawa");
-    const [profileBio, setProfileBio] = useState("");
-    const [avatarPath, setAvatarPath] = useState<string | null>(null);
+const [profileName, setProfileName] = useState("");
+const [profileCountry, setProfileCountry] = useState("Canada");
+const [profileProvince, setProfileProvince] = useState("Ontario");
+const [profileGenre, setProfileGenre] = useState("Punk");
+const [profileSubGenre, setProfileSubGenre] = useState("");
+const [profileCity, setProfileCity] = useState("Ottawa");
+const [profileBio, setProfileBio] = useState("");
+const [avatarPath, setAvatarPath] = useState<string | null>(null);
+
 
 const uploadProfileComplete = useMemo(() => {
   const nameOk = (profileName ?? "").trim().length >= 2;
@@ -344,12 +370,12 @@ async function checkForExistingShow(date: string) {
       }
 
       setStatus("Loading tracks...");
-      const { data, error } = await supabase
-        .from("tracks")
-        .select("id,title,country,province,city,genre,is_radio,band_slug,file_path,art_path,price_cents,created_at")
-        .eq("band_slug", bandSlug)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false });
+const { data, error } = await supabase
+  .from("tracks")
+  .select("id,title,country,province,city,genre,sub_genre,is_radio,band_slug,file_path,art_path,price_cents,created_at")
+  .eq("band_slug", bandSlug)
+  .order("created_at", { ascending: false })
+  .order("id", { ascending: false });
 
       if (error) {
         setStatus(`DB load error: ${error.message}`);
@@ -415,12 +441,12 @@ async function checkForExistingShow(date: string) {
 
         didCheck = true;
 
-        const { data, error } = await supabase
-          .from("band_users")
-          .select("user_id, band_slug, band_name, display_name, country, province, genre, city, bio, avatar_path")
-          .eq("band_slug", bandSlug)
-          .eq("user_id", uid)
-          .maybeSingle();
+const { data, error } = await supabase
+  .from("band_users")
+  .select("user_id, band_slug, band_name, display_name, country, province, genre, sub_genre, city, bio, avatar_path")
+  .eq("band_slug", bandSlug)
+  .eq("user_id", uid)
+  .maybeSingle();
 
         if (error) {
           setStatus(`Profile load error: ${error.message}`);
@@ -430,21 +456,26 @@ async function checkForExistingShow(date: string) {
         if (data) {
           const row = data as BandUserProfileRow;
 
-          const name = normSpaces(row.display_name ?? row.band_name ?? "");
-          const country = toTitleCaseSmart(row.country ?? "") || "Canada";
-          const province = toTitleCaseSmart(row.province ?? "") || "Ontario";
-          const city = toTitleCaseSmart(row.city ?? "") || "Ottawa";
-          const genre = toTitleCaseSmart(row.genre ?? "") || "Punk";
-          const bio = row.bio ?? "";
-          const av = row.avatar_path ?? null;
+const name = normSpaces(row.display_name ?? row.band_name ?? "");
+const country = toTitleCaseSmart(row.country ?? "") || "Canada";
+const province = toTitleCaseSmart(row.province ?? "") || "Ontario";
+const city = toTitleCaseSmart(row.city ?? "") || "Ottawa";
 
-          setProfileName(name);
-          setProfileCountry(country);
-          setProfileProvince(province);
-          setProfileCity(city);
-          setProfileGenre(genre);
-          setProfileBio(bio);
-          setAvatarPath(av);
+const rawGenre = toTitleCaseSmart(row.genre ?? "") || "Punk";
+const genre = GENRE_OPTIONS.includes(rawGenre as (typeof GENRE_OPTIONS)[number]) ? rawGenre : "Other";
+
+const subGenre = normSpaces(row.sub_genre ?? "");
+const bio = row.bio ?? "";
+const av = row.avatar_path ?? null;
+
+setProfileName(name);
+setProfileCountry(country);
+setProfileProvince(province);
+setProfileCity(city);
+setProfileGenre(genre);
+setProfileSubGenre(subGenre);
+setProfileBio(bio);
+setAvatarPath(av);
 
           setDisplayName((prev) => prev || name);
         }
@@ -467,30 +498,34 @@ async function checkForExistingShow(date: string) {
         return;
       }
 
-      const cleanName = normSpaces(profileName);
+const cleanName = normSpaces(profileName);
 
-      const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
-      const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
-      const cleanGenre = toTitleCaseSmart(profileGenre) || "Punk";
+const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
+const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
+const cleanGenre = GENRE_OPTIONS.includes(profileGenre as (typeof GENRE_OPTIONS)[number])
+  ? profileGenre
+  : "Punk";
+const cleanSubGenre = normSpaces(profileSubGenre);
 
-      const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
-      const cleanBio = normSpaces(profileBio);
+const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
+const cleanBio = normSpaces(profileBio);
 
       setProfileSaving(true);
       setStatus("Saving profile...");
 
-      const payload = {
-        user_id: uid,
-        band_slug: bandSlug,
-        band_name: cleanName || bandSlug,
-        display_name: cleanName,
-        country: cleanCountry,
-        province: cleanProvince,
-        genre: cleanGenre,
-        city: cleanCity,
-        bio: cleanBio,
-        avatar_path: avatarPath,
-      };
+const payload = {
+  user_id: uid,
+  band_slug: bandSlug,
+  band_name: cleanName || bandSlug,
+  display_name: cleanName,
+  country: cleanCountry,
+  province: cleanProvince,
+  genre: cleanGenre,
+  sub_genre: cleanSubGenre || null,
+  city: cleanCity,
+  bio: cleanBio,
+  avatar_path: avatarPath,
+};
 
       const { error } = await supabase.from("band_users").upsert(payload, { onConflict: "user_id,band_slug" });
 
@@ -500,12 +535,13 @@ async function checkForExistingShow(date: string) {
         return;
       }
 
-      setProfileName(cleanName);
-      setProfileCountry(cleanCountry);
-      setProfileProvince(cleanProvince);
-      setProfileGenre(cleanGenre);
-      setProfileCity(cleanCity);
-      setProfileBio(cleanBio);
+setProfileName(cleanName);
+setProfileCountry(cleanCountry);
+setProfileProvince(cleanProvince);
+setProfileGenre(cleanGenre);
+setProfileSubGenre(cleanSubGenre);
+setProfileCity(cleanCity);
+setProfileBio(cleanBio);
 
       setStatus("Profile saved.");
       setTimeout(() => setStatus(""), 1200);
@@ -593,24 +629,28 @@ async function uploadOneTrack(file: File, idx: number, total: number) {
 
   const defaultTitle = originalName.replace(/\.[^/.]+$/, "");
 
-  const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
-  const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
-  const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
-  const cleanGenre = toTitleCaseSmart(profileGenre) || "Punk";
+const cleanCity = toTitleCaseSmart(profileCity) || "Ottawa";
+const cleanCountry = toTitleCaseSmart(profileCountry) || "Canada";
+const cleanProvince = toTitleCaseSmart(profileProvince) || "Ontario";
+const cleanGenre = GENRE_OPTIONS.includes(profileGenre as (typeof GENRE_OPTIONS)[number])
+  ? profileGenre
+  : "Punk";
+const cleanSubGenre = normSpaces(profileSubGenre);
 
-  const ins = await supabase.from("tracks").insert({
-    band_slug: bandSlug,
-    title: defaultTitle,
+const ins = await supabase.from("tracks").insert({
+  band_slug: bandSlug,
+  title: defaultTitle,
 
-    country: cleanCountry,
-    province: cleanProvince,
-    city: cleanCity,
-    genre: cleanGenre,
+  country: cleanCountry,
+  province: cleanProvince,
+  city: cleanCity,
+  genre: cleanGenre,
+  sub_genre: cleanSubGenre || null,
 
-    is_radio: true,
-    file_path: storagePath,
-    price_cents: 100,
-  });
+  is_radio: true,
+  file_path: storagePath,
+  price_cents: 100,
+});
 
   if (ins.error) throw ins.error;
 }
@@ -649,53 +689,56 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
 }
 
 
-    function startEdit(t: TrackView) {
-      const cents = Number((t as any).price_cents ?? 100);
-      setEditPrice((cents / 100).toFixed(2));
+function startEdit(t: TrackView) {
+  const cents = Number((t as any).price_cents ?? 100);
+  setEditPrice((cents / 100).toFixed(2));
 
-      setEditingId(t.id);
-      setEditTitle(t.title ?? "");
-      setEditGenre(t.genre ?? "");
-      setEditRadio(!!t.is_radio);
+  setEditingId(t.id);
+  setEditTitle(t.title ?? "");
+  setEditGenre(t.genre ?? "");
+  setEditSubGenre(t.sub_genre ?? "");
+  setEditRadio(!!t.is_radio);
 
-      if (editArtPreview) URL.revokeObjectURL(editArtPreview);
-      setEditArtPreview("");
-      setArtUploading(false);
-    }
+  if (editArtPreview) URL.revokeObjectURL(editArtPreview);
+  setEditArtPreview("");
+  setArtUploading(false);
+}
 
-    async function saveEdit(id: string) {
-      const cleanTitle = normSpaces(editTitle);
-      if (!cleanTitle) {
-        setStatus("Title can't be empty.");
-        return;
-      }
+async function saveEdit(id: string) {
+  const cleanTitle = normSpaces(editTitle);
+  if (!cleanTitle) {
+    setStatus("Title can't be empty.");
+    return;
+  }
 
-      const parsed = Number(editPrice || "1");
-      const safe = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-      const price_cents = Math.round(safe * 100);
+  const parsed = Number(editPrice || "1");
+  const safe = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+  const price_cents = Math.round(safe * 100);
 
-      setStatus("Saving...");
+  setStatus("Saving...");
 
-      const cleanGenre = toTitleCaseSmart(editGenre || "");
+  const cleanGenre = toTitleCaseSmart(editGenre || "");
+  const cleanSubGenre = normSpaces(editSubGenre);
 
-      const patch = {
-        title: cleanTitle,
-        genre: cleanGenre || "Punk",
-        is_radio: editRadio,
-        price_cents,
-      };
+  const patch = {
+    title: cleanTitle,
+    genre: cleanGenre || "Punk",
+    sub_genre: cleanSubGenre || null,
+    is_radio: editRadio,
+    price_cents,
+  };
 
-      const { error } = await supabase.from("tracks").update(patch).eq("id", id);
-      if (error) {
-        setStatus(`Edit failed: ${error.message}`);
-        return;
-      }
+  const { error } = await supabase.from("tracks").update(patch).eq("id", id);
+  if (error) {
+    setStatus(`Edit failed: ${error.message}`);
+    return;
+  }
 
-      setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
-      setEditingId(null);
-      setStatus("");
-    }
+  setEditingId(null);
+  setStatus("");
+}
 
     async function pickAndUploadArtwork(track: TrackView, file: File) {
       if (!bandSlug) {
@@ -1291,18 +1334,35 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
               title="Will be saved standardized (ex: Ottawa)"
             />
 
-            <input
-              value={profileGenre}
-              onChange={(e) => setProfileGenre(e.target.value.toUpperCase())}
-              placeholder="Genre (ex: Punk, Metal, Hip-Hop)"
-              style={{
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "1px solid #ccc",
-                textTransform: "uppercase",
-              }}
-              title="This is your band’s default genre (used when uploading new tracks)"
-            />
+<select
+  value={profileGenre}
+  onChange={(e) => setProfileGenre(e.target.value)}
+  style={{
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #ccc",
+    background: "white",
+  }}
+  title="Choose your band’s main genre"
+>
+  {GENRE_OPTIONS.map((g) => (
+    <option key={g} value={g}>
+      {g}
+    </option>
+  ))}
+</select>
+
+<input
+  value={profileSubGenre}
+  onChange={(e) => setProfileSubGenre(e.target.value)}
+  placeholder="Sub Genre (optional: Skate Punk, Horror Punk, Pop Punk)"
+  style={{
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #ccc",
+  }}
+  title="Optional sub genre under your main genre"
+/>
 
             <textarea
               value={profileBio}
@@ -1567,18 +1627,37 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
                       }}
                     />
 
-                    <input
-                      value={editGenre}
-                      onChange={(e) => setEditGenre(e.target.value)}
-                      placeholder="Genre (ex: Punk, Pop, Metal)"
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid #ccc",
-                      }}
-                    />
+<select
+  value={editGenre}
+  onChange={(e) => setEditGenre(e.target.value)}
+  style={{
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #ccc",
+    background: "white",
+  }}
+  title="Main genre for this song"
+>
+  {GENRE_OPTIONS.map((g) => (
+    <option key={g} value={g}>
+      {g}
+    </option>
+  ))}
+</select>
 
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+<input
+  value={editSubGenre}
+  onChange={(e) => setEditSubGenre(e.target.value)}
+  placeholder="Sub Genre (optional: Skate Punk, D-Beat, Horror Punk)"
+  style={{
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #ccc",
+  }}
+  title="Optional sub genre for this song"
+/>
+
+<div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                       <input
                         value={editPrice}
                         onChange={(e) => {
@@ -1601,7 +1680,9 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
                         Radio
                       </label>
 
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>Location is a snapshot from upload time. Genre is editable per-song.</div>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>
+  Location is a snapshot from upload time. Main genre and optional sub genre are editable per-song.
+</div>
                     </div>
 
                     {/* Artwork picker */}
@@ -1667,14 +1748,15 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
                         Save
                       </button>
 
-                      <button
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditGenre("");
-                          if (editArtPreview) URL.revokeObjectURL(editArtPreview);
-                          setEditArtPreview("");
-                          setArtUploading(false);
-                        }}
+<button
+  onClick={() => {
+    setEditingId(null);
+    setEditGenre("");
+    setEditSubGenre("");
+    if (editArtPreview) URL.revokeObjectURL(editArtPreview);
+    setEditArtPreview("");
+    setArtUploading(false);
+  }}
                         style={{
                           padding: "10px 12px",
                           borderRadius: 10,
@@ -1741,6 +1823,7 @@ async function onUpload(filesOrOne: FileList | File | File[]) {
                           title={loc}
                         >
                           <b>{priceLabel}</b>, {t.is_radio ? "Yes" : "No"} Radio, {loc}, {t.genre}
+                          {t.sub_genre ? ` → ${t.sub_genre}` : ""}
                         </div>
                       </div>
 
