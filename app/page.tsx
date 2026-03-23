@@ -2117,7 +2117,6 @@ right={null}
           flexShrink: 0,
         }}
       >
-        Song:
       </div>
       <div
         style={{
