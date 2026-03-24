@@ -423,11 +423,26 @@ function setCarPlayNowPlaying(t: TrackView | null) {
     ];
   }
 
+  function mergeArtworkSets(items: Array<{ src: string; type: string }>) {
+    const seen = new Set<string>();
+    const out: Array<{ src: string; sizes: string; type: string }> = [];
+
+    for (const item of items) {
+      const src = (item.src || "").trim();
+      if (!src) continue;
+      if (seen.has(src)) continue;
+      seen.add(src);
+      out.push(...buildArtworkSet(src, item.type));
+    }
+
+    return out;
+  }
+
   if (!t) {
     ms.metadata = new MediaMetadata({
       title: "StreetLevel",
       artist: "StreetLevel",
-      album: "StreetLevel",
+      album: "StreetLevel.live",
       artwork: buildArtworkSet(logoSrc, logoType),
     });
 
@@ -438,23 +453,25 @@ function setCarPlayNowPlaying(t: TrackView | null) {
     return;
   }
 
-  const rawArtworkSrc =
-    t.avatarUrl ||
-    t.artUrl ||
-    t.flyerUrl ||
-    STREETLEVEL_LOGO;
+  const avatarSrc = toAbsoluteUrl(t.avatarUrl || "");
+  const avatarType = guessImageType(avatarSrc);
 
-  const artworkSrc = toAbsoluteUrl(rawArtworkSrc);
-  const artworkType = guessImageType(artworkSrc);
+  const artSrc = toAbsoluteUrl(t.artUrl || "");
+  const artType = guessImageType(artSrc);
+
+  const flyerSrc = toAbsoluteUrl(t.flyerUrl || "");
+  const flyerType = guessImageType(flyerSrc);
 
   ms.metadata = new MediaMetadata({
     title: t.title || "Untitled",
     artist: t.bandDisplayName || t.bandName || t.band_slug || "StreetLevel",
-    album: "StreetLevel",
-    artwork: [
-      ...buildArtworkSet(artworkSrc, artworkType),
-      ...buildArtworkSet(logoSrc, logoType),
-    ],
+    album: "StreetLevel.live",
+    artwork: mergeArtworkSets([
+      { src: avatarSrc, type: avatarType },
+      { src: artSrc, type: artType },
+      { src: flyerSrc, type: flyerType },
+      { src: logoSrc, type: logoType },
+    ]),
   });
 
   try {
