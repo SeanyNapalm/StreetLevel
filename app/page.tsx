@@ -238,6 +238,8 @@ export default function HomePage() {
 
   // WHAT
   const [genre, setGenre] = useState("");
+  const [subGenre, setSubGenre] = useState("");
+  const [subGenreOptions, setSubGenreOptions] = useState<string[]>([]);
 
   // WHERE
   const [country, setCountry] = useState("");
@@ -692,6 +694,7 @@ if (shouldOpenSetup) {
     const ci = url.searchParams.get("city") ?? "";
 
     const g = url.searchParams.get("genre") ?? "";
+    const sg = url.searchParams.get("sub_genre") ?? "";
     const d = url.searchParams.get("date") ?? "";
     const qq = url.searchParams.get("q") ?? "";
     const evn = url.searchParams.get("event") ?? "";
@@ -702,6 +705,7 @@ if (shouldOpenSetup) {
     if (ci) setCity(ci);
 
     if (g) setGenre(g);
+    if (sg) setSubGenre(sg);
     if (d) setDate(d);
     if (qq) setQ(qq);
     if (evn) setEventShowName(evn);
@@ -819,6 +823,7 @@ if (shouldOpenSetup) {
     setOrDel("city", city);
 
     setOrDel("genre", genre);
+    setOrDel("sub_genre", subGenre);
     setOrDel("date", date);
     setOrDel("q", q);
     setOrDel("event", eventShowName);
@@ -1067,7 +1072,11 @@ const mappedRaw: TrackView[] = (ts ?? []).map((r: TrackRow) => {
 });
 
       // ✅ filter out banned
-      const mapped = mappedRaw.filter((t) => !banIdsRef.current.has(t.id));
+            const mapped = mappedRaw.filter((t) => {
+        if (banIdsRef.current.has(t.id)) return false;
+        if (subGenre && norm(t.sub_genre).toLowerCase() !== norm(subGenre).toLowerCase()) return false;
+        return true;
+      });
 
       setTracks(mapped);
 
@@ -1183,7 +1192,11 @@ const mappedAllRaw: TrackView[] = (all ?? []).map((r: TrackRow) => ({
   bandName: bh?.band_name ?? "",
 }));
 
-        const mappedAll = mappedAllRaw.filter((t) => !banIdsRef.current.has(t.id));
+                const mappedAll = mappedAllRaw.filter((t) => {
+          if (banIdsRef.current.has(t.id)) return false;
+          if (subGenre && norm(t.sub_genre).toLowerCase() !== norm(subGenre).toLowerCase()) return false;
+          return true;
+        });
 
         setTracks(mappedAll);
 
@@ -1282,7 +1295,11 @@ const mappedRaw: TrackView[] = (data ?? []).map((r: TrackRow) => ({
   bandName: bandNameBySlug.get(r.band_slug) ?? "",
 }));
 
-    const mapped = mappedRaw.filter((t) => !banIdsRef.current.has(t.id));
+        const mapped = mappedRaw.filter((t) => {
+      if (banIdsRef.current.has(t.id)) return false;
+      if (subGenre && norm(t.sub_genre).toLowerCase() !== norm(subGenre).toLowerCase()) return false;
+      return true;
+    });
 
     setTracks(mapped);
 
@@ -1306,7 +1323,7 @@ const mappedRaw: TrackView[] = (data ?? []).map((r: TrackRow) => ({
   useEffect(() => {
     syncUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, country, province, city, genre, q, eventShowName, offlineMode]);
+  }, [date, country, province, city, genre, subGenre, q, eventShowName, offlineMode]);
 
   // ============== OPTIONS ==============
 const genreOptions = useMemo(() => {
@@ -1314,23 +1331,36 @@ const genreOptions = useMemo(() => {
 
   const s = new Set<string>();
 
-  // ✅ ALWAYS include base genres
+  // ✅ Start with your preferred order (Punk first 😎)
   for (const g of GENRE_OPTIONS) {
     s.add(g);
   }
 
-  // ✅ add any genres discovered from tracks
+  // ✅ Add any dynamic genres (but don't reorder)
   for (const g of masterGenres) {
     const clean = norm(g);
-    if (clean) s.add(clean);
+    if (clean && !s.has(clean)) {
+      s.add(clean);
+    }
   }
 
-  // ✅ keep current selection if custom
+  // ✅ Ensure current selection is included
   const current = norm(genre);
-  if (current) s.add(current);
+  if (current && !s.has(current)) {
+    s.add(current);
+  }
 
-  return ["", ...Array.from(s).sort((a, b) => a.localeCompare(b))];
+  return ["", ...Array.from(s)];
 }, [date, eventGenreOptions, masterGenres, genre]);
+
+
+
+
+useEffect(() => {
+  setSubGenre("");
+}, [genre]);
+
+
 
   const cityOptions = useMemo(() => {
     if (date) return ["", ...eventCityOptions];
@@ -1418,6 +1448,37 @@ useEffect(() => {
   setPendingFreshRound(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [pendingFreshRound, filtered.length]);
+
+useEffect(() => {
+  async function loadSubGenres() {
+    if (!genre.trim() || date) {
+      setSubGenreOptions([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("tracks")
+      .select("sub_genre")
+      .eq("genre", genre)
+      .not("sub_genre", "is", null);
+
+    if (error) {
+      console.warn("sub genre load error:", error.message);
+      setSubGenreOptions([]);
+      return;
+    }
+
+    const s = new Set<string>();
+    for (const row of data ?? []) {
+      const sg = norm((row as any).sub_genre);
+      if (sg) s.add(sg);
+    }
+
+    setSubGenreOptions(Array.from(s));
+  }
+
+  loadSubGenres();
+}, [genre, date]);
 
   // Try to start audio whenever nowPlaying changes
   useEffect(() => {
@@ -2136,15 +2197,23 @@ right={null}
 
 
 <div style={{ display: "grid", gap: 10, padding: 14 }}>
-  <div style={{ display: "grid", gap: 8 }}>
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "baseline",
-        gap: 8,
-      }}
-    >
+  <div
+  style={{
+    display: "grid",
+    gap: 8,
+    textAlign: "center",   // 👈 THIS DOES MOST OF THE WORK
+    justifyItems: "center" // 👈 centers children nicely
+  }}
+>
+<div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center", // 👈 KEY
+    alignItems: "baseline",
+    gap: 8,
+  }}
+>
       <div
         style={{
           fontSize: 12,
@@ -2170,10 +2239,11 @@ right={null}
 
     <div
       style={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "baseline",
-        gap: 8,
+display: "flex",
+flexWrap: "wrap",
+justifyContent: "center", // 👈 KEY
+alignItems: "baseline",
+gap: 8,
       }}
     >
       <div
@@ -2202,13 +2272,14 @@ right={null}
       </div>
     </div>
 
-    <div
-      style={{
-        fontSize: 12,
-        opacity: 0.65,
-        lineHeight: 1.3,
-      }}
-    >
+<div
+  style={{
+    fontSize: 12,
+    opacity: 0.65,
+    lineHeight: 1.3,
+    textAlign: "center",
+  }}
+>
 {bandHeader ? (
   <>
     {(bandHeader.city || "—")} • {(bandHeader.genre || "—")}
@@ -2808,6 +2879,45 @@ right={null}
                       </option>
                     ))}
                   </select>
+
+{genre && !date ? (
+  <div style={{ display: "grid", gap: 6 }}>
+    <div
+      style={{
+        fontSize: 12,
+        opacity: 0.8,
+        fontWeight: 900,
+        letterSpacing: 0.6,
+      }}
+    >
+      SUB GENRE
+    </div>
+
+    <select
+      value={subGenre}
+      onChange={(e) => setSubGenre(e.target.value)}
+      style={{
+        width: "100%",
+        maxWidth: FILTER_FIELD_MAX,
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "white",
+        color: "black",
+        fontWeight: 700,
+      }}
+      title="Optional sub genre under your selected main genre"
+    >
+      <option value="">Any sub genre</option>
+      {subGenreOptions.map((sg) => (
+        <option key={sg} value={sg}>
+          {sg}
+        </option>
+      ))}
+    </select>
+  </div>
+) : null}
+
                 </div>
 
                 {/* WHERE */}
