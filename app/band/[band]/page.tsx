@@ -225,6 +225,10 @@ const [profileCity, setProfileCity] = useState("Ottawa");
 const [profileBio, setProfileBio] = useState("");
 const [avatarPath, setAvatarPath] = useState<string | null>(null);
 
+const [streetCredCents, setStreetCredCents] = useState(0);
+const [streetCredLoading, setStreetCredLoading] = useState(true);
+const [buyingCred, setBuyingCred] = useState(false);
+const [streetCredAboutOpen, setStreetCredAboutOpen] = useState(false);
 
 const uploadProfileComplete = useMemo(() => {
   const nameOk = (profileName ?? "").trim().length >= 2;
@@ -294,6 +298,29 @@ const uploadGateMsg = useMemo(() => {
 
 
 
+async function confirmAndBuyStreetCred(amountDollars: 5 | 10 | 20) {
+  const bandPayouts: Record<5 | 10 | 20, string> = {
+    5: "4.10",
+    10: "8.47",
+    20: "17.21",
+  };
+
+  const ok = window.confirm(
+    `You are about to buy $${amountDollars.toFixed(2)} Street Cred for exactly $${amountDollars.toFixed(2)}.\n\n` +
+    `How it works:\n` +
+    `• You pay exactly $${amountDollars.toFixed(2)}\n` +
+    `• Stripe takes its payment processing fee\n` +
+    `• StreetLevel pays bands 90% of what remains after Stripe\n\n` +
+    `Example:\n` +
+    `If you spend $${amountDollars.toFixed(2)} on one band, that band would receive about $${bandPayouts[amountDollars]}.\n\n` +
+    `Press OK to continue to checkout.`
+  );
+
+  if (!ok) return;
+
+  await buyStreetCred(amountDollars);
+}
+
 async function checkForExistingShow(date: string) {
   if (!date) return;
 
@@ -345,6 +372,79 @@ async function checkForExistingShow(date: string) {
       if (error) return null;
       return data.user?.id ?? null;
     }
+
+    async function loadStreetCred() {
+  if (!bandSlug) return;
+
+  const uid = await getAuthedUserId();
+  if (!uid) {
+    setStreetCredCents(0);
+    setStreetCredLoading(false);
+    return;
+  }
+
+  setStreetCredLoading(true);
+
+  const { data, error } = await supabase
+    .from("streetcred")
+    .select("balance_cents")
+    .eq("user_id", uid)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Street cred load error:", error.message);
+    setStreetCredCents(0);
+    setStreetCredLoading(false);
+    return;
+  }
+
+  setStreetCredCents(Number(data?.balance_cents ?? 0));
+  setStreetCredLoading(false);
+}
+
+async function buyStreetCred(amountDollars: 5 | 10 | 20) {
+  try {
+    setBuyingCred(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      throw new Error(userError.message);
+    }
+
+    if (!user?.id) {
+      throw new Error("You must be logged in to buy Street Cred.");
+    }
+
+    const res = await fetch("/api/create-checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+body: JSON.stringify({
+  amountDollars,
+  bandSlug,
+  userId: user.id,
+  returnTo: `/band/${bandSlug}`,
+}),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data?.url) {
+      throw new Error(data?.error || "Could not create checkout session.");
+    }
+
+    window.location.href = data.url;
+  } catch (e: any) {
+    setStatus(`Buy credits failed: ${e?.message ?? String(e)}`);
+  } finally {
+    setBuyingCred(false);
+  }
+}
 
     async function doLogout() {
       setLoggingOut(true);
@@ -1087,31 +1187,33 @@ async function saveEdit(id: string) {
       await loadGallery();
     }
 
-    useEffect(() => {
-      const { data } = supabase.auth.onAuthStateChange((event) => {
-        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-          loadProfile();
-          loadGallery();
-          refreshTracks();
-          loadEvents();
-        }
-      });
-
-      return () => data.subscription.unsubscribe();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [bandSlug]);
-
-    useEffect(() => {
-      const url = new URL(window.location.href);
-      const n = url.searchParams.get("name");
-      if (n) setDisplayName(n);
-
-      refreshTracks();
+useEffect(() => {
+  const { data } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
       loadProfile();
       loadGallery();
+      refreshTracks();
       loadEvents();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [bandSlug]);
+      loadStreetCred();
+    }
+  });
+
+  return () => data.subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [bandSlug]);
+
+useEffect(() => {
+  const url = new URL(window.location.href);
+  const n = url.searchParams.get("name");
+  if (n) setDisplayName(n);
+
+  refreshTracks();
+  loadProfile();
+  loadGallery();
+  loadEvents();
+  loadStreetCred();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [bandSlug]);
 
     useEffect(() => {
       if (!lightboxOpen) return;
@@ -1510,6 +1612,133 @@ async function saveEdit(id: string) {
           </section>
         </div>
 
+
+        {/* =========================
+            STREET CRED
+          ========================= */}
+        <section
+          style={{
+            marginTop: 14,
+            border: "1px solid #eee",
+            borderRadius: 18,
+            padding: 18,
+            display: "grid",
+            gap: 12,
+            background: "white",
+          }}
+        >
+          {/* TOP ROW: BALANCE + ABOUT */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+              width: "100%",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 950,
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Street Cred: {streetCredLoading ? "Loading..." : `$${(streetCredCents / 100).toFixed(2)}`}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setStreetCredAboutOpen(true)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                background: "black",
+                color: "#2bff00",
+                fontWeight: 900,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              About Street Cred
+            </button>
+          </div>
+
+{/* BOTTOM ROW: BUY BUTTONS */}
+<div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    width: "100%",
+  }}
+>
+  <button
+    onClick={() => confirmAndBuyStreetCred(5)}
+    disabled={buyingCred}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 10,
+      border: "1px solid #ccc",
+      background: "black",
+      color: "#2bff00",
+      fontWeight: 900,
+      cursor: buyingCred ? "not-allowed" : "pointer",
+      opacity: buyingCred ? 0.6 : 1,
+      whiteSpace: "nowrap",
+    }}
+  >
+    {buyingCred ? "Working..." : "Buy $5"}
+  </button>
+
+  <button
+    onClick={() => confirmAndBuyStreetCred(10)}
+    disabled={buyingCred}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 10,
+      border: "1px solid #ccc",
+      background: "black",
+      color: "#2bff00",
+      fontWeight: 900,
+      cursor: buyingCred ? "not-allowed" : "pointer",
+      opacity: buyingCred ? 0.6 : 1,
+      whiteSpace: "nowrap",
+    }}
+  >
+    {buyingCred ? "Working..." : "Buy $10"}
+  </button>
+
+  <button
+    onClick={() => confirmAndBuyStreetCred(20)}
+    disabled={buyingCred}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 10,
+      border: "1px solid #ccc",
+      background: "black",
+      color: "#2bff00",
+      fontWeight: 900,
+      cursor: buyingCred ? "not-allowed" : "pointer",
+      opacity: buyingCred ? 0.6 : 1,
+      whiteSpace: "nowrap",
+    }}
+  >
+    {buyingCred ? "Working..." : "Buy $20"}
+  </button>
+</div>
+ 
+          <div style={{ fontSize: 12, opacity: 0.65, textAlign: "center" }}>
+            Use "Street Creds"" to buy songs and support bands!
+          </div>
+        </section>
+
+
+
         {/* =========================
             2) TRACKS (SOLO)
           ========================= */}
@@ -1518,82 +1747,102 @@ async function saveEdit(id: string) {
 {/* Upload header */}
 <div
   style={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
+    display: "grid",
     gap: 10,
     background: "white",
-    color: "black",
-    padding: "10px 14px",
+    padding: "0",
     borderRadius: 12,
-    border: "1px solid #eee",
   }}
 >
-  <div style={{ fontWeight: 900, letterSpacing: 1 }}>TRACKS</div>
-
-
-  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-<button
-  type="button"
-  onClick={() => {
-    if (uploading) return;
-
-    if (!uploadProfileComplete) {
-      setStatus(uploadGateMsg);
-      alert(uploadGateMsg); // ✅ impossible to miss (great for Android + iPhone)
-      return;
-    }
-
-    audioInputRef.current?.click();
-  }}
-  disabled={uploading || !uploadProfileComplete}
-  style={{
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #ccc",
-    cursor: uploading || !uploadProfileComplete ? "not-allowed" : "pointer",
-    fontWeight: 900,
-    background: "black",
-    color: "#2bff00",
-    opacity: uploading || !uploadProfileComplete ? 0.6 : 1,
-    width: "fit-content",
-    flexShrink: 0,
-  }}
-  title={!uploadProfileComplete ? uploadGateMsg : "Upload audio (multi-select supported)"}
->
-  {uploading ? "Uploading..." : "Upload audio"}
-</button>
-
-<input
-  ref={audioInputRef}
-  type="file"
-  accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/flac,audio/ogg,audio/opus"
-  multiple
-  style={{ display: "none" }}
-  onChange={(e) => {
-    const picked = Array.from(e.currentTarget.files ?? []);
-    e.currentTarget.value = "";
-    if (picked.length === 0) return;
-
-    setStatus(`Picked ${picked.length} file(s)`);
-    onUpload(picked);
-  }}
-/>
-
-
+  <div
+    style={{
+      background: "black",
+      color: "#2bff00",
+      padding: "12px 14px",
+      borderRadius: 12,
+      textAlign: "center",
+      fontWeight: 950,
+      letterSpacing: 1,
+      fontSize: 18,
+      lineHeight: 1,
+      textTransform: "uppercase",
+    }}
+  >
+    Tracks
   </div>
 
-  {!uploadProfileComplete ? (
-  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>
-    {uploadGateMsg}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 10,
+      background: "white",
+      padding: "10px 14px",
+      borderRadius: 12,
+      border: "1px solid #eee",
+    }}
+  >
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={() => {
+          if (uploading) return;
+
+          if (!uploadProfileComplete) {
+            setStatus(uploadGateMsg);
+            alert(uploadGateMsg);
+            return;
+          }
+
+          audioInputRef.current?.click();
+        }}
+        disabled={uploading || !uploadProfileComplete}
+        style={{
+          padding: "10px 12px",
+          borderRadius: 10,
+          border: "1px solid #ccc",
+          cursor: uploading || !uploadProfileComplete ? "not-allowed" : "pointer",
+          fontWeight: 900,
+          background: "black",
+          color: "#2bff00",
+          opacity: uploading || !uploadProfileComplete ? 0.6 : 1,
+          width: "fit-content",
+          flexShrink: 0,
+        }}
+        title={!uploadProfileComplete ? uploadGateMsg : "Upload audio (multi-select supported)"}
+      >
+        {uploading ? "Uploading..." : "Upload audio"}
+      </button>
+
+      <input
+        ref={audioInputRef}
+        type="file"
+        accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/flac,audio/ogg,audio/opus"
+        multiple
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const picked = Array.from(e.currentTarget.files ?? []);
+          e.currentTarget.value = "";
+          if (picked.length === 0) return;
+
+          setStatus(`Picked ${picked.length} file(s)`);
+          onUpload(picked);
+        }}
+      />
+    </div>
+
+    {!uploadProfileComplete ? (
+      <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>
+        {uploadGateMsg}
+      </div>
+    ) : !bioRecommendedComplete ? (
+      <div style={{ fontSize: 12, opacity: 0.6 }}>
+        Bio is optional, but recommended (10+ chars) so fans know what you’re about.
+      </div>
+    ) : null}
   </div>
-) : !bioRecommendedComplete ? (
-  <div style={{ fontSize: 12, opacity: 0.6 }}>
-    Bio is optional, but recommended (10+ chars) so fans know what you’re about.
-  </div>
-) : null}
-  
 </div>
 
           <div style={{ fontSize: 12, opacity: 0.7 }}>{tracks.length} total</div>
@@ -2558,7 +2807,249 @@ onChange={(e) => {
 ) : null}
 
 
+        {streetCredAboutOpen ? (
+          <div
+            onClick={() => setStreetCredAboutOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              zIndex: 1000,
+              display: "grid",
+              placeItems: "center",
+              padding: 16,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "min(760px, 100%)",
+                maxHeight: "90vh",
+                overflowY: "auto",
+                background: "white",
+                borderRadius: 18,
+                padding: 20,
+                border: "1px solid #ddd",
+                display: "grid",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div style={{ fontSize: 24, fontWeight: 950, lineHeight: 1.1 }}>
+                  About Street Cred
+                </div>
 
+                <button
+                  type="button"
+                  onClick={() => setStreetCredAboutOpen(false)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #ccc",
+                    background: "black",
+                    color: "white",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 12, fontSize: 15, lineHeight: 1.6 }}>
+                <p style={{ margin: 0 }}>
+                  Street Cred is our wallet system. It lets fans load up credits once, then use
+                  them to buy songs without getting hammered by payment processor fees on every
+                  single track.
+                </p>
+
+                <p style={{ margin: 0 }}>
+                  Stripe’s percentage fee is manageable. The real killer is the extra 30¢ on each
+                  transaction. On cheap music purchases, that fixed fee can take a brutal chunk
+                  out of what the band should have earned.
+                </p>
+
+                <p style={{ margin: 0 }}>
+                  So here is the new StreetLevel model in plain English: the buyer pays exactly
+                  the amount of Street Cred they want. StreetLevel absorbs Stripe on the front
+                  end, then pays bands 90% of the money left after Stripe fees.
+                </p>
+
+                <div
+                  style={{
+                    fontWeight: 950,
+                    fontSize: 20,
+                    lineHeight: 1.25,
+                  }}
+                >
+                  On the same dollars spent, StreetLevel pays artists more than Bandcamp.
+                </div>
+
+                <div
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 17,
+                    lineHeight: 1.25,
+                  }}
+                >
+                  Buyer pays exact value. Bands still come out ahead.
+                </div>
+
+                <div style={{ overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: 14,
+                      background: "white",
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th
+                          style={{
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            borderBottom: "1px solid #ddd",
+                            fontWeight: 950,
+                            whiteSpace: "normal",
+                            lineHeight: 1.15,
+                          }}
+                        >
+                          Buyer
+                          <br />
+                          Spends
+                        </th>
+                        <th
+                          style={{
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            borderBottom: "1px solid #ddd",
+                            fontWeight: 950,
+                            whiteSpace: "normal",
+                            lineHeight: 1.15,
+                          }}
+                        >
+                          StreetLevel
+                          <br />
+                          Band Gets
+                        </th>
+                        <th
+                          style={{
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            borderBottom: "1px solid #ddd",
+                            fontWeight: 950,
+                            whiteSpace: "normal",
+                            lineHeight: 1.15,
+                          }}
+                        >
+                          Bandcamp
+                          <br />
+                          Band Gets
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {[
+                        ["$5", "$4.10", "~$3.83"],
+                        ["$10", "$8.47", "~$7.95"],
+                        ["$20", "$17.21", "~$16.21"],
+                      ].map((row, i) => (
+                        <tr key={i}>
+                          {row.map((cell, j) => (
+                            <td
+                              key={j}
+                              style={{
+                                padding: "10px 12px",
+                                borderBottom: i === 2 ? "none" : "1px solid #eee",
+                                fontWeight: j === 1 ? 950 : 500,
+                                color: j === 1 ? "#0a7f00" : "black",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ fontSize: 13, opacity: 0.72, lineHeight: 1.5 }}>
+                  StreetLevel figures here assume the buyer loads one wallet purchase, then spends
+                  that amount on one band. Bandcamp figures shown here are approximate comparison
+                  examples using platform fees plus payment processing.
+                </div>
+
+                <div
+                  style={{
+                    border: "1px solid #eee",
+                    borderRadius: 14,
+                    padding: 14,
+                    background: "#fafafa",
+                    display: "grid",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ fontWeight: 950, fontSize: 18 }}>
+                    Why not just buy $1 songs one at a time?
+                  </div>
+                  <div>Stripe fee = 2.9% + 30¢</div>
+                  <div>2.9% of $1.00 = 2.9¢</div>
+                  <div>30¢ + 2.9¢ = 32.9¢ total Stripe fee</div>
+                  <div>
+                    That means a $1.00 purchase loses <b>32.9%</b> immediately before the band
+                    even gets paid.
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    border: "1px solid #eee",
+                    borderRadius: 14,
+                    padding: 14,
+                    background: "#fafafa",
+                    display: "grid",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ fontWeight: 950, fontSize: 18 }}>
+                    Why the wallet helps
+                  </div>
+                  <div>
+                    <b>$5 purchase:</b> Stripe fee is about 45.5¢
+                  </div>
+                  <div>
+                    <b>$10 purchase:</b> Stripe fee is about 59¢
+                  </div>
+                  <div>
+                    <b>$20 purchase:</b> Stripe fee is about 88¢
+                  </div>
+                  <div>
+                    Bigger wallet loads reduce the damage from repeat transaction fees, which
+                    means more money reaches the bands instead of disappearing into payment
+                    processing.
+                  </div>
+                </div>
+
+                <p style={{ margin: 0 }}>
+                  So yeah — this system exists to protect underground bands from getting crushed
+                  by middle-man fees, while keeping the buying experience clean and fair for fans.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <StreetLevelFooter />
       </main>

@@ -66,6 +66,9 @@ type GalleryItem = {
   url: string;
 };
 
+
+
+
 function getPublicUrl(path: string | null) {
   if (!path) return "";
   const res = supabase.storage.from("tracks").getPublicUrl(path);
@@ -182,26 +185,190 @@ async function creditBandPageHitOnce(slug: string) {
   }
 }
 
+async function downloadTrackFile(track: TrackView) {
+  if (!track.url) {
+    alert("This track has no audio file yet.");
+    return;
+  }
+
+  const response = await fetch(track.url);
+  if (!response.ok) {
+    throw new Error(`Download failed with status ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+
+  const ext =
+    track.url.toLowerCase().includes(".wav") ? "wav" :
+    track.url.toLowerCase().includes(".flac") ? "flac" :
+    track.url.toLowerCase().includes(".m4a") ? "m4a" :
+    track.url.toLowerCase().includes(".aac") ? "aac" :
+    "mp3";
+
+  const safeName = (track.title || "track").replace(/[\\/:*?"<>|]/g, "_");
+
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = `${safeName}.${ext}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(objectUrl);
+}
+
 async function buyTrack(track: TrackView) {
   try {
-    const res = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trackId: track.id }),
+    const priceCents = Number(track.price_cents ?? 100);
+
+    const { data: authData } = await supabase.auth.getSession();
+    const uid = authData.session?.user?.id ?? "";
+
+    if (!uid) {
+      alert("Please log in first.");
+      return;
+    }
+
+    if (!track.url) {
+      alert("This track has no audio file yet.");
+      return;
+    }
+
+    // already owned = no charge, just download again
+    if (ownedIds.has(track.id)) {
+      if (downloadToFiles) {
+        await downloadTrackFile(track);
+      }
+
+      if (downloadToOffline) {
+        console.log("TODO: save owned track in StreetLevel offline storage", {
+          trackId: track.id,
+          title: track.title,
+          url: track.url,
+        });
+      }
+
+      window.setTimeout(() => {
+        showNotice(
+          "success",
+          "Already owned",
+          `"${track.title || "Untitled"}" downloaded again.`
+        );
+      }, 800);
+
+      return;
+    }
+
+    if (streetCredCents < priceCents) {
+      showNotice(
+        "error",
+        "Not enough Street Cred",
+        `Track price: $${(priceCents / 100).toFixed(2)}\nYour balance: $${(
+          streetCredCents / 100
+        ).toFixed(2)}`
+      );
+      return;
+    }
+
+    const newBalance = streetCredCents - priceCents;
+
+    const { error: updateError } = await supabase
+      .from("streetcred")
+      .update({ balance_cents: newBalance })
+      .eq("user_id", uid);
+
+    if (updateError) {
+      alert(`Street Cred update failed: ${updateError.message}`);
+      return;
+    }
+
+    const { error: purchaseError } = await supabase
+      .from("purchases")
+      .insert({
+        user_id: uid,
+        track_id: track.id,
+        price_cents: priceCents,
+      });
+
+    if (purchaseError) {
+      alert(`Purchase record failed: ${purchaseError.message}`);
+      return;
+    }
+
+    setStreetCredCents(newBalance);
+    setOwnedIds((prev) => {
+      const next = new Set(prev);
+      next.add(track.id);
+      return next;
     });
 
-    const data = await res.json();
-
-    if (data?.url) {
-      window.location.href = data.url; // Stripe Checkout
-    } else {
-      alert("Checkout failed to start.");
+    if (downloadToFiles) {
+      try {
+        await downloadTrackFile(track);
+      } catch (err) {
+        console.error("File download failed:", err);
+        alert("The track was purchased, but the file download failed.");
+      }
     }
+
+    if (downloadToOffline) {
+      console.log("TODO: save in StreetLevel offline storage", {
+        trackId: track.id,
+        title: track.title,
+        url: track.url,
+      });
+    }
+
+    window.setTimeout(() => {
+      showNotice(
+        "success",
+        "Track purchased",
+        `"${track.title || "Untitled"}" downloaded.\nNew Street Cred balance: $${(
+          newBalance / 100
+        ).toFixed(2)}`
+      );
+    }, 1200);
   } catch (e) {
     console.error(e);
-    alert("Network error starting checkout.");
+    showNotice("error", "Purchase failed", "Something went wrong.");
   }
 }
+function openDownloadOptions(track: TrackView) {
+  setDownloadTrack(track);
+  setDownloadToFiles(true);
+  setDownloadToOffline(true);
+  setDownloadOptionsOpen(true);
+}
+
+
+function showNotice(
+  type: "success" | "error",
+  title: string,
+  message: string
+) {
+  setNotice({ type, title, message });
+
+  window.setTimeout(() => {
+    setNotice((current) =>
+      current?.title === title && current?.message === message ? null : current
+    );
+  }, 3200);
+}
+
+async function continueWithDownloadOptions() {
+  if (!downloadTrack) return;
+
+  if (!downloadToFiles && !downloadToOffline) {
+    alert("Pick at least one option before continuing.");
+    return;
+  }
+
+  setDownloadOptionsOpen(false);
+
+  await buyTrack(downloadTrack);
+}
+
 
   const { band: bandSlugRaw } = use(params);
   const bandSlug = (bandSlugRaw ?? "").trim();
@@ -211,6 +378,24 @@ async function buyTrack(track: TrackView) {
 // ✅ logged-in user (optional) + banned track ids for this user
 const [userId, setUserId] = useState<string>("");
 const [bannedIds, setBannedIds] = useState<Set<string>>(new Set());
+
+const [streetCredCents, setStreetCredCents] = useState<number>(0);
+const [streetCredLoading, setStreetCredLoading] = useState<boolean>(true);
+const [buyingCred, setBuyingCred] = useState(false);
+
+
+const [downloadOptionsOpen, setDownloadOptionsOpen] = useState(false);
+const [downloadTrack, setDownloadTrack] = useState<TrackView | null>(null);
+const [downloadToFiles, setDownloadToFiles] = useState(true);
+const [downloadToOffline, setDownloadToOffline] = useState(true);
+
+const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
+
+const [notice, setNotice] = useState<{
+  type: "success" | "error";
+  title: string;
+  message: string;
+} | null>(null);
 
 async function loadMyBans() {
   // user might not be logged in — that's fine
@@ -237,6 +422,142 @@ async function loadMyBans() {
   const s = new Set<string>((bans ?? []).map((b: any) => String(b.track_id)));
   setBannedIds(s);
 }
+
+
+
+async function loadMyStreetCred() {
+  setStreetCredLoading(true);
+
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user?.id ?? "";
+
+  if (!uid) {
+    setStreetCredCents(0);
+    setStreetCredLoading(false);
+    return;
+  }
+
+  const { data: row, error } = await supabase
+    .from("streetcred")
+    .select("balance_cents")
+    .eq("user_id", uid)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("loadMyStreetCred error:", error.message);
+    setStreetCredCents(0);
+    setStreetCredLoading(false);
+    return;
+  }
+
+  setStreetCredCents(Number(row?.balance_cents ?? 0));
+  setStreetCredLoading(false);
+}
+
+
+async function loadMyPurchases() {
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user?.id ?? "";
+
+  if (!uid) {
+    setOwnedIds(new Set());
+    return;
+  }
+
+  const { data: rows, error } = await supabase
+    .from("purchases")
+    .select("track_id")
+    .eq("user_id", uid);
+
+  if (error) {
+    console.warn("loadMyPurchases error:", error.message);
+    setOwnedIds(new Set());
+    return;
+  }
+
+  setOwnedIds(new Set((rows ?? []).map((r: any) => String(r.track_id))));
+}
+
+async function buyStreetCred(amountDollars: 5 | 10 | 20) {
+  try {
+    setBuyingCred(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      throw new Error(userError.message);
+    }
+
+    if (!user?.id) {
+      alert("Please log in first.");
+      return;
+    }
+
+    const res = await fetch("/api/create-checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+body: JSON.stringify({
+  amountDollars,
+  bandSlug,
+  userId: user.id,
+  returnTo: `/b/${bandSlug}`,
+}),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data?.url) {
+      throw new Error(data?.error || "Could not create checkout session.");
+    }
+
+    window.location.href = data.url;
+  } catch (e: any) {
+    alert(`Buy credits failed: ${e?.message ?? String(e)}`);
+  } finally {
+    setBuyingCred(false);
+  }
+}
+
+async function confirmAndBuyStreetCred(amountDollars: 5 | 10 | 20) {
+  const checkoutTotals: Record<5 | 10 | 20, string> = {
+    5: "5.72",
+    10: "10.98",
+    20: "21.49",
+  };
+
+  const streetLevelFees: Record<5 | 10 | 20, string> = {
+    5: "0.25",
+    10: "0.50",
+    20: "1.00",
+  };
+
+  const stripeFees: Record<5 | 10 | 20, string> = {
+    5: "0.47",
+    10: "0.48",
+    20: "0.49",
+  };
+
+  const ok = window.confirm(
+    `To give you $${amountDollars.toFixed(2)} Street Cred, the total charge is $${checkoutTotals[amountDollars]}.\n\n` +
+    `Why?\n` +
+    `• $${amountDollars.toFixed(2)} = your Street Cred balance\n` +
+    `• $${streetLevelFees[amountDollars]} = StreetLevel fee\n` +
+    `• $${stripeFees[amountDollars]} = Stripe fee\n\n` +
+    `That means you pay $${checkoutTotals[amountDollars]} total to receive $${amountDollars.toFixed(2)} in usable credits.\n\n` +
+    `Press OK to continue to checkout.`
+  );
+
+  if (!ok) return;
+
+  await buyStreetCred(amountDollars);
+}
+
+
 
 async function undoBan(trackId: string) {
   if (!userId) return;
@@ -449,6 +770,10 @@ useEffect(() => {
 
   // ✅ load bans for logged-in user (if any)
   loadMyBans();
+  loadMyStreetCred();
+  loadMyPurchases();
+
+
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [bandSlug]);
@@ -660,19 +985,112 @@ useEffect(() => {
 
         {/* TRACKS */}
         <section>
-          <div
-            style={{
-              fontWeight: 950,
-              letterSpacing: 0.7,
-              marginBottom: 10,
-              padding: "12px 14px",
-              borderRadius: 14,
-              background: "black",
-              color: "#2bff00",
-            }}
-          >
-            TRACKS
-          </div>
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 10,
+    padding: "12px 14px",
+    borderRadius: 14,
+    background: "black",
+    color: "#2bff00",
+    flexWrap: "wrap",
+  }}
+>
+  <div
+    style={{
+      fontWeight: 950,
+      letterSpacing: 0.7,
+    }}
+  >
+    TRACKS
+  </div>
+
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+      justifyContent: "flex-end",
+    }}
+  >
+<div
+  style={{
+    fontWeight: 900,
+    fontSize: 14,
+    whiteSpace: "nowrap",
+    color: "white",
+    letterSpacing: 0.4,
+  }}
+  title="Your Street Cred balance"
+>
+  Your Street Cred:{" "}
+  <span style={{ fontWeight: 950 }}>
+    {streetCredLoading ? "Loading..." : `$${(streetCredCents / 100).toFixed(2)}`}
+  </span>
+</div>
+
+    <button
+      onClick={() => confirmAndBuyStreetCred(5)}
+      disabled={buyingCred}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(43,255,0,0.4)",
+        background: "rgba(0,0,0,0.6)",
+        color: "#2bff00",
+        fontWeight: 900,
+        cursor: buyingCred ? "not-allowed" : "pointer",
+        opacity: buyingCred ? 0.6 : 1,
+        whiteSpace: "nowrap",
+      }}
+      title="Add $5 Street Cred"
+    >
+      {buyingCred ? "Working..." : "+$5"}
+    </button>
+
+    <button
+      onClick={() => confirmAndBuyStreetCred(10)}
+      disabled={buyingCred}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(43,255,0,0.4)",
+        background: "rgba(0,0,0,0.6)",
+        color: "#2bff00",
+        fontWeight: 900,
+        cursor: buyingCred ? "not-allowed" : "pointer",
+        opacity: buyingCred ? 0.6 : 1,
+        whiteSpace: "nowrap",
+      }}
+      title="Add $10 Street Cred"
+    >
+      {buyingCred ? "Working..." : "+$10"}
+    </button>
+
+    <button
+      onClick={() => confirmAndBuyStreetCred(20)}
+      disabled={buyingCred}
+      style={{
+        padding: "6px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(43,255,0,0.4)",
+        background: "rgba(0,0,0,0.6)",
+        color: "#2bff00",
+        fontWeight: 900,
+        cursor: buyingCred ? "not-allowed" : "pointer",
+        opacity: buyingCred ? 0.6 : 1,
+        whiteSpace: "nowrap",
+      }}
+      title="Add $20 Street Cred"
+    >
+      {buyingCred ? "Working..." : "+$20"}
+    </button>
+  </div>
+</div>
 
 <div style={{ display: "grid", gap: 10 }}>
   {tracks.map((t) => {
@@ -758,25 +1176,26 @@ useEffect(() => {
         )}
 
 
-
-{/* BUY + (optional) UNDO BAN */}
+{/* BUY + STREET CRED + (optional) UNDO BAN */}
 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-  <button
-    onClick={() => buyTrack(t)}
-    style={{
-      padding: "10px 12px",
-      borderRadius: 10,
-      border: "1px solid #000",
-      background: "black",
-      color: "#2bff00",
-      fontWeight: 950,
-      cursor: "pointer",
-      width: "fit-content",
-    }}
-    title="Buy this track"
-  >
-    Buy track • {priceLabel}
-  </button>
+<button
+  onClick={() => openDownloadOptions(t)}
+  style={{
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: ownedIds.has(t.id) ? "1px solid #0a7f00" : "1px solid #000",
+    background: ownedIds.has(t.id) ? "#eaffea" : "black",
+    color: ownedIds.has(t.id) ? "#0a7f00" : "#2bff00",
+    fontWeight: 950,
+    cursor: "pointer",
+    width: "fit-content",
+  }}
+  title={ownedIds.has(t.id) ? "You already own this track" : "Buy this track"}
+>
+  {ownedIds.has(t.id) ? "Owned ✓" : `Buy track • ${priceLabel}`}
+</button>
+
+
 
   {bannedIds.has(t.id) ? (
     <button
@@ -988,6 +1407,237 @@ return (
           </div>
         </section>
       </div>
+
+
+            {downloadOptionsOpen && downloadTrack ? (
+        <div
+          onClick={() => setDownloadOptionsOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 9998,
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(620px, 100%)",
+              background: "white",
+              borderRadius: 18,
+              border: "1px solid #ddd",
+              padding: 20,
+              display: "grid",
+              gap: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ fontSize: 24, fontWeight: 950, lineHeight: 1.1 }}>
+                Download Options
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDownloadOptionsOpen(false)}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #ccc",
+                  background: "black",
+                  color: "white",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ fontSize: 15, lineHeight: 1.6 }}>
+              You are about to buy <b>{downloadTrack.title || "Untitled"}</b>.
+              <br />
+              Choose where you want it saved after purchase:
+            </div>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                padding: 12,
+                border: "1px solid #eee",
+                borderRadius: 14,
+                cursor: "pointer",
+                background: "#fafafa",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={downloadToFiles}
+                onChange={(e) => setDownloadToFiles(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <div>
+                <div style={{ fontWeight: 950 }}>Download to Files</div>
+                <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
+                  Save the music file to the user’s device so they own a downloadable copy.
+                </div>
+              </div>
+            </label>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                padding: 12,
+                border: "1px solid #eee",
+                borderRadius: 14,
+                cursor: "pointer",
+                background: "#fafafa",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={downloadToOffline}
+                onChange={(e) => setDownloadToOffline(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <div>
+                <div style={{ fontWeight: 950 }}>Save in StreetLevel for offline</div>
+                <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
+                  Keep a copy in StreetLevel app storage so it can play later without internet.
+                </div>
+              </div>
+            </label>
+
+            <div
+              style={{
+                fontSize: 13,
+                opacity: 0.75,
+                lineHeight: 1.5,
+                border: "1px solid #eee",
+                borderRadius: 14,
+                padding: 12,
+                background: "#fafafa",
+              }}
+            >
+              For now, this popup saves the user’s choices before continuing.
+              Next we’ll wire those choices into real file download and real offline storage.
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setDownloadOptionsOpen(false)}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #ccc",
+                  background: "white",
+                  color: "black",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={continueWithDownloadOptions}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #000",
+                  background: "black",
+                  color: "#2bff00",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+
+      {notice ? (
+        <div
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: 16,
+            zIndex: 10000,
+            width: "min(420px, calc(100vw - 32px))",
+            background: "white",
+            border: "1px solid #ddd",
+            borderRadius: 18,
+            boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
+            padding: 16,
+            display: "grid",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 20,
+              fontWeight: 950,
+              color: notice.type === "success" ? "#0a7f00" : "#cc0000",
+              lineHeight: 1.1,
+            }}
+          >
+            {notice.title}
+          </div>
+
+          <div
+            style={{
+              fontSize: 15,
+              lineHeight: 1.5,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {notice.message}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #000",
+                background: "black",
+                color: "#2bff00",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* LIGHTBOX MODAL */}
       {lightboxOpen && activePhoto ? (

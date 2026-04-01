@@ -257,6 +257,7 @@ export default function HomePage() {
   const [eventCityOptions, setEventCityOptions] = useState<string[]>([]);
 
   const [tracks, setTracks] = useState<TrackView[]>([]);
+  const [latestTracks, setLatestTracks] = useState<TrackView[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [pendingFreshRound, setPendingFreshRound] = useState(false);
 
@@ -795,6 +796,15 @@ if (shouldOpenSetup) {
     setCity("");
     setWhereStep("country");
   }
+
+  function clearGenre() {
+  setGenre("");
+  setSubGenre("");
+}
+
+function resetGenreStep() {
+  setSubGenre("");
+}
 
   function pickEventAndPlay(ev: EventRow) {
     const showName = normSpaces(ev.note ?? "").toUpperCase();
@@ -1497,6 +1507,71 @@ useEffect(() => {
   loadSubGenres();
 }, [genre, date]);
 
+
+useEffect(() => {
+  async function loadLatestTracks() {
+    const { data, error } = await supabase
+      .from("tracks")
+      .select("id,title,country,province,city,genre,sub_genre,is_radio,band_slug,file_path,art_path,created_at")
+      .order("created_at", { ascending: false })
+      .limit(12);
+
+    if (error) {
+      console.warn("latest tracks load error:", error.message);
+      setLatestTracks([]);
+      return;
+    }
+
+    const bandSlugs = Array.from(
+      new Set((data ?? []).map((r: any) => String(r.band_slug ?? "").trim()).filter(Boolean))
+    );
+
+    let avatarBySlug = new Map<string, string>();
+    let displayNameBySlug = new Map<string, string>();
+    let bandNameBySlug = new Map<string, string>();
+
+    if (bandSlugs.length) {
+      const { data: bandRows } = await supabase
+        .from("band_users")
+        .select("band_slug, avatar_path, display_name, band_name")
+        .in("band_slug", bandSlugs)
+        .order("user_id", { ascending: true });
+
+      for (const b of bandRows ?? []) {
+        const slug = String((b as any).band_slug ?? "").trim();
+        if (!slug) continue;
+
+        if (!avatarBySlug.has(slug)) {
+          avatarBySlug.set(slug, getAvatarUrl((b as any).avatar_path ?? null));
+        }
+
+        if (!displayNameBySlug.has(slug)) {
+          displayNameBySlug.set(slug, String((b as any).display_name ?? "").trim());
+        }
+
+        if (!bandNameBySlug.has(slug)) {
+          bandNameBySlug.set(slug, String((b as any).band_name ?? "").trim());
+        }
+      }
+    }
+
+    const mapped: TrackView[] = (data ?? []).map((r: TrackRow) => ({
+      ...r,
+      url: getPublicUrl(r.file_path),
+      artUrl: getArtworkUrl(r.art_path),
+      avatarUrl: avatarBySlug.get(r.band_slug) ?? "",
+      flyerUrl: "",
+      bandDisplayName: displayNameBySlug.get(r.band_slug) ?? "",
+      bandName: bandNameBySlug.get(r.band_slug) ?? "",
+    }));
+
+    setLatestTracks(mapped);
+  }
+
+  loadLatestTracks();
+}, []);
+
+
   // Try to start audio whenever nowPlaying changes
   useEffect(() => {
     if (!nowPlaying) {
@@ -1658,7 +1733,7 @@ async function radioLetsGo() {
 
  
   const shouldPulseSetupButton = queue.length === 0 && !nowPlaying;
-  const showWelcomeContent = queue.length === 0 && !nowPlaying && !bandHeader;
+  
 
 
   const mainMaxWidth = 1900;
@@ -2179,9 +2254,10 @@ right={null}
   style={{
     marginTop: 0,
     display: "grid",
-    gridTemplateColumns: isNarrow ? "1fr" : "clamp(360px, 38vw, 560px) 1fr",
+    gridTemplateColumns: "1fr",
     gap: 14,
     alignItems: "start",
+    justifyItems: "center", // 👈 centers children
   }}
 >
               {/* LEFT: Now Playing */}
@@ -2491,10 +2567,13 @@ gap: 8,
     </div>
   </section>
 ) : (
+
 <section
   style={{
     display: "grid",
     gap: 12,
+    width: "100%",
+    maxWidth: 900, // 👈 controls page width
   }}
 >
   <div
@@ -2512,173 +2591,135 @@ gap: 8,
     NOW PLAYING
   </div>
 
-  <div
+  <section
     style={{
       border: "1px solid #eee",
       borderRadius: 18,
-      padding: 14,
+      padding: 18,
+      display: "grid",
+      gap: 16,
       background: "white",
     }}
   >
-    <div style={{ fontWeight: 950, lineHeight: 1.2 }}>
-      Nothing playing yet. 
-    </div>
-
-     <div style={{ fontWeight: 650, lineHeight: 1.2 }}>
-        Hit "Setup" to get started!
-    </div>
-
+<div
+  style={{
+    display: "grid",
+    gap: 6,
+    justifyItems: "center",
+    textAlign: "center",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontWeight: 1950,
+      fontSize: 26,
+    }}
+  >
+    <span
+  style={{
+    fontSize: 22,
+    color: "#2bff00",
+    animation: "slBounceUp 1.2s ease-in-out infinite",
+  }}
+>
+  ↑
+</span>
+    <span>Nothing playing yet.</span>
   </div>
+
+  <div
+    style={{
+      fontWeight: 650,
+      fontSize: 14,
+    }}
+  >
+    Hit "Setup" to get started!
+  </div>
+</div>
+
+    <div style={{ display: "grid", gap: 10 }}>
+      <div
+        style={{
+          fontSize: 12,
+          opacity: 0.7,
+          letterSpacing: 0.7,
+          fontWeight: 900,
+          textTransform: "uppercase",
+        }}
+      >
+        
+      </div>
+
+      <div
+        style={{
+          fontSize: 28,
+          fontWeight: 950,
+          lineHeight: 1.08,
+          maxWidth: 900,
+        }}
+      >
+        From the underground, up to your Street.
+      </div>
+
+      <div
+        style={{
+          fontSize: 15,
+          lineHeight: 1.65,
+          opacity: 0.82,
+          maxWidth: 900,
+          display: "grid",
+          gap: 10,
+        }}
+      >
+        <div>
+          StreetLevel is a city-first underground music platform built to help people discover local bands,
+          shows, and the songs that get shoved to the bottom by the mainstream machine.
+        </div>
+
+        <div>
+          Choose how specific you want your playlist to be. Pick a city, genre, event, band, or just hit
+          Setup and let the radio surprise you.
+        </div>
+      </div>
+    </div>
+  </section>
 </section>
 )}
               </div>
 
-{/* RIGHT: Queue / Welcome */}
-<section style={{ display: "grid", gap: 12 }}>
-
-<div
+{/* RIGHT: Queue / Latest Uploads */}
+<section
   style={{
-    background: "black",
-    color: "#2bff00",
-    textAlign: "center",
-    fontWeight: 950,
-    fontSize: 13,
-    letterSpacing: 1,
-    padding: "8px 10px",
-    borderRadius: 9,
+    display: "grid",
+    gap: 12,
+    width: "100%",
+    maxWidth: 900,
   }}
 >
-  NEXT SONGS
-</div>
 
-  {showWelcomeContent ? (
-    <section
-      style={{
-        border: "1px solid #eee",
-        borderRadius: 18,
-        padding: 18,
-        display: "grid",
-        gap: 16,
-        background: "white",
-      }}
-    >
-      <div style={{ display: "grid", gap: 10 }}>
-        <div
-          style={{
-            fontSize: 12,
-            opacity: 0.7,
-            letterSpacing: 0.7,
-            fontWeight: 900,
-            textTransform: "uppercase",
-          }}
-        >
-          StreetLevel
-        </div>
+  <div
+    style={{
+      background: "black",
+      color: "#2bff00",
+      textAlign: "center",
+      fontWeight: 950,
+      fontSize: 13,
+      letterSpacing: 1,
+      padding: "8px 10px",
+      borderRadius: 9,
+    }}
+  >
+    {queue.length === 0 ? "LATEST UPLOADS" : "NEXT SONGS"}
+  </div>
 
-        <div
-          style={{
-            fontSize: 28,
-            fontWeight: 950,
-            lineHeight: 1.08,
-            maxWidth: 900,
-          }}
-        >
-          From the underground, up to your Street.
-        </div>
-
-        <div
-          style={{
-            fontSize: 15,
-            lineHeight: 1.65,
-            opacity: 0.82,
-            maxWidth: 900,
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <div>
-            StreetLevel is a city-first underground music platform built to help people discover local bands,
-            shows, and the songs that get shoved to the bottom by the mainstream machine.
-          </div>
-
-        </div>
-      </div>
-
-      <section
-        style={{
-          border: "1px solid #eee",
-          borderRadius: 16,
-          padding: 16,
-          display: "grid",
-          gap: 14,
-          background: "#fafafa",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 20,
-            fontWeight: 950,
-            lineHeight: 1.15,
-          }}
-        >
-          Getting Started
-        </div>
-
-        <div style={{ display: "grid", gap: 14 }}>
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
-              1. Open Setup
-            </div>
-
-            <div style={{ fontSize: 15, lineHeight: 1.65, display: "grid", gap: 8 }}>
-              <div>
-                Choose how specific you want your playlist to be.
-              </div>
-
-              <div>
-                Start the radio with no filters at all, and you’ll hear one song from every band on the entire platform.
-              </div>
-
-              <div>
-                Add a city, country, genre, band, or event name to narrow the playlist and aim it where you want.
-              </div>
-
-              <div>
-                StreetLevel picks one song per band for the queue, so bands with 50 songs do not get more airtime than bands with 5.
-              </div>
-
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
-              2. Hit "Radio Lets Go" to get the music rolling!
-            </div>
-
-            <div style={{ fontSize: 15, lineHeight: 1.65 }}>
-              That builds your playlist based on whatever specifics you chose.
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ fontSize: 17, fontWeight: 950, lineHeight: 1.2 }}>
-              3. Use Play / Next
-            </div>
-
-            <div style={{ fontSize: 15, lineHeight: 1.65 }}>
-              Start your playlist, skip forward, and keep the underground rolling.
-            </div>
-          </div>
-        </div>
-      </section>
-    </section>
-  ) : (
-    <>
-      {queue.map((t) => (
-        <QueueRow key={t.id} t={t} />
-      ))}
-    </>
-  )}
+  <section style={{ display: "grid", gap: 10 }}>
+    {(queue.length === 0 ? latestTracks : queue).map((t) => (
+      <QueueRow key={t.id} t={t} />
+    ))}
+  </section>
 </section>
             </div>
           </div>
@@ -2884,58 +2925,144 @@ gap: 8,
                   gap: 10,
                 }}
               >
-                {/* WHAT */}
-                <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
-                    What Genre?:)
-                  </div>
-                  <select value={genre} onChange={(e) => setGenre(e.target.value)} className="sl-select">
-                    {(genreOptions.length ? genreOptions : [""]).map((g) => (
-                      <option key={g || "any"} value={g}>
-                        {g || "Any genre"}
-                      </option>
-                    ))}
-                  </select>
+{/* WHAT */}
+<div style={{ display: "grid", gap: 6 }}>
+  <div style={{ fontSize: 12, fontWeight: 950, color: "white", letterSpacing: 0.7 }}>
+    What Genre?:)
+  </div>
 
-{genre && !date ? (
-  <div style={{ display: "grid", gap: 6 }}>
+  {genre ? (
     <div
       style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 8,
+        alignItems: "center",
         fontSize: 12,
-        opacity: 0.8,
-        fontWeight: 900,
-        letterSpacing: 0.6,
+        opacity: 0.9,
       }}
     >
-      SUB GENRE
+      <button
+        type="button"
+        onClick={resetGenreStep}
+        style={{
+          padding: "6px 10px",
+          borderRadius: 999,
+          border: "1px solid #ddd",
+          background: "black",
+          color: "white",
+          fontWeight: 900,
+          cursor: "pointer",
+        }}
+        title="Change genre"
+      >
+        {genre}
+      </button>
+
+      {subGenre ? (
+        <button
+          type="button"
+          onClick={() => setSubGenre("")}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 999,
+            border: "1px solid #ddd",
+            background: "black",
+            color: "white",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+          title="Change sub genre"
+        >
+          {subGenre}
+        </button>
+      ) : null}
     </div>
+  ) : null}
 
-    <select
-      value={subGenre}
-      onChange={(e) => setSubGenre(e.target.value)}
-      style={{
-        width: "100%",
-        maxWidth: FILTER_FIELD_MAX,
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: "1px solid #ddd",
-        background: "white",
-        color: "black",
-        fontWeight: 700,
-      }}
-      title="Optional sub genre under your selected main genre"
-    >
-      <option value="">Any sub genre</option>
-      {subGenreOptions.map((sg) => (
-        <option key={sg} value={sg}>
-          {sg}
-        </option>
-      ))}
-    </select>
-  </div>
-) : null}
+  {!genre ? (
+    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
+        <select
+          value={genre}
+          onChange={(e) => {
+            setGenre(e.target.value);
+            setSubGenre("");
+          }}
+          className="sl-select"
+          style={{ width: "100%" }}
+        >
+          {(genreOptions.length ? genreOptions : [""]).map((g) => (
+            <option key={g || "any"} value={g}>
+              {g || "Any genre"}
+            </option>
+          ))}
+        </select>
+      </div>
 
-                </div>
+      <button
+        type="button"
+        onClick={clearGenre}
+        disabled={!genre && !subGenre}
+        style={{
+          padding: "12px 14px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          background: "black",
+          color: "#2bff00",
+          fontWeight: 950,
+          cursor: !genre && !subGenre ? "not-allowed" : "pointer",
+          whiteSpace: "nowrap",
+          opacity: !genre && !subGenre ? 0.45 : 1,
+        }}
+        title="Clear genre filters"
+      >
+        Clear
+      </button>
+    </div>
+  ) : null}
+
+  {genre && !date ? (
+    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ flex: 1, minWidth: 0, maxWidth: FILTER_FIELD_MAX }}>
+        <select
+          value={subGenre}
+          onChange={(e) => setSubGenre(e.target.value)}
+          className="sl-select"
+          style={{ width: "100%" }}
+          title="Optional sub genre under your selected main genre"
+        >
+          <option value="">Any sub genre</option>
+          {subGenreOptions.map((sg) => (
+            <option key={sg} value={sg}>
+              {sg}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        type="button"
+        onClick={clearGenre}
+        disabled={!genre && !subGenre}
+        style={{
+          padding: "12px 14px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          background: "black",
+          color: "#2bff00",
+          fontWeight: 950,
+          cursor: !genre && !subGenre ? "not-allowed" : "pointer",
+          whiteSpace: "nowrap",
+          opacity: !genre && !subGenre ? 0.45 : 1,
+        }}
+        title="Clear genre filters"
+      >
+        Clear
+      </button>
+    </div>
+  ) : null}
+</div>
 
                 {/* WHERE */}
                 <div style={{ display: "grid", gap: 6 }}>
@@ -3390,38 +3517,44 @@ onClick={async () => {
 <style>{`
 @keyframes slPulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(43, 255, 0, 0.0);
+    box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.0);
     transform: scale(1);
     background: black;
     color: white;
   }
 
   30% {
-    box-shadow: 0 0 25px 6px rgba(43, 255, 0, 0.9);
+    box-shadow: 0 0 25px 6px rgb(89, 255, 0);
     transform: scale(1.08);
-    background: #0a0a0a;
-    color: #2bff00;
+    background: #1a0f00;
+    color: "#2bff00";
   }
 
   60% {
-    box-shadow: 0 0 35px 10px rgba(43, 255, 0, 1);
+    box-shadow: 0 0 40px 12px rgba(115, 255, 0, 0.44);
     transform: scale(1.12);
-    background: #111;
-    color: #2bff00;
+    background: #2a1600;
+    color: "#2bff00";
   }
 
   100% {
-    box-shadow: 0 0 0 0 rgba(43, 255, 0, 0.0);
+    box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.0);
     transform: scale(1);
     background: black;
     color: white;
   }
+}
 }
 
 @keyframes slWiggle {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(1deg); }
   75% { transform: rotate(-1deg); }
+}
+
+@keyframes slBounceUp {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 `}</style>
 
