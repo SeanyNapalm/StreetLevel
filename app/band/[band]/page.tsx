@@ -1819,7 +1819,7 @@ useEffect(() => {
       <input
         ref={audioInputRef}
         type="file"
-        accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,audio/flac,audio/ogg,audio/opus"
+        accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus"
         multiple
         style={{ display: "none" }}
         onChange={(e) => {
@@ -1833,8 +1833,13 @@ useEffect(() => {
       />
     </div>
 
-    {!uploadProfileComplete ? (
-      <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>
+{/* 👇 ADD THIS LINE RIGHT HERE */}
+<div style={{ fontSize: 12, opacity: 0.6 }}>
+  On Android/Samsung: choose “My Files” to access your stored music.
+</div>
+
+{!uploadProfileComplete ? (
+  <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}>
         {uploadGateMsg}
       </div>
     ) : !bioRecommendedComplete ? (
