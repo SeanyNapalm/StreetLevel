@@ -271,32 +271,28 @@ async function buyTrack(track: TrackView) {
       return;
     }
 
-    const newBalance = streetCredCents - priceCents;
+    const res = await fetch("/api/buy-track", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: uid,
+        trackId: track.id,
+      }),
+    });
 
-    const { error: updateError } = await supabase
-      .from("streetcred")
-      .update({ balance_cents: newBalance })
-      .eq("user_id", uid);
+    const data = await res.json();
 
-    if (updateError) {
-      alert(`Street Cred update failed: ${updateError.message}`);
+    if (!res.ok) {
+      showNotice("error", "Purchase failed", data?.error || "Something went wrong.");
       return;
     }
 
-    const { error: purchaseError } = await supabase
-      .from("purchases")
-      .insert({
-        user_id: uid,
-        track_id: track.id,
-        price_cents: priceCents,
-      });
+    const newBuyerBalance = Number(data?.buyerBalanceCents ?? streetCredCents);
+    const artistCents = Number(data?.artistCents ?? 0);
 
-    if (purchaseError) {
-      alert(`Purchase record failed: ${purchaseError.message}`);
-      return;
-    }
-
-    setStreetCredCents(newBalance);
+    setStreetCredCents(newBuyerBalance);
     setOwnedIds((prev) => {
       const next = new Set(prev);
       next.add(track.id);
@@ -325,7 +321,9 @@ async function buyTrack(track: TrackView) {
         "success",
         "Track purchased",
         `"${track.title || "Untitled"}" downloaded.\nNew Street Cred balance: $${(
-          newBalance / 100
+          newBuyerBalance / 100
+        ).toFixed(2)}\n${prettyFromSlug(track.band_slug)} earned $${(
+          artistCents / 100
         ).toFixed(2)}`
       );
     }, 1200);
@@ -334,6 +332,7 @@ async function buyTrack(track: TrackView) {
     showNotice("error", "Purchase failed", "Something went wrong.");
   }
 }
+
 function openDownloadOptions(track: TrackView) {
   setDownloadTrack(track);
   setDownloadToFiles(true);
