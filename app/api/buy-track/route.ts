@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid track price" }, { status: 400 });
     }
 
-    const artistCents = Math.floor(priceCents * 0.9);
+    const artistCents = Math.floor(priceCents * 0.87);
 
     // 2) Check if already purchased
     const { data: existingPurchase, error: purchaseCheckError } = await supabase

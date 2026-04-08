@@ -12,9 +12,7 @@ export async function POST(req: NextRequest) {
     const userId = String(body?.userId ?? "");
     const returnTo = String(body?.returnTo ?? "");
 
-    let unitAmount = 500;
-    if (amountDollars === 10) unitAmount = 1000;
-    if (amountDollars === 20) unitAmount = 2000;
+    let unitAmount = Math.ceil((amountDollars * 1.029 + 0.30) * 100);
 
     const origin =
       process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";

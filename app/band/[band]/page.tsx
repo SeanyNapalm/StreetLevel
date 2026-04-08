@@ -299,22 +299,22 @@ const uploadGateMsg = useMemo(() => {
 
 
 async function confirmAndBuyStreetCred(amountDollars: 5 | 10 | 20) {
-  const bandPayouts: Record<5 | 10 | 20, string> = {
-    5: "4.10",
-    10: "8.47",
-    20: "17.21",
+  const estimatedTotals: Record<5 | 10 | 20, string> = {
+    5: "5.45",
+    10: "10.59",
+    20: "20.88",
   };
 
-  const ok = window.confirm(
-    `You are about to buy $${amountDollars.toFixed(2)} Street Cred for exactly $${amountDollars.toFixed(2)}.\n\n` +
-    `How it works:\n` +
-    `• You pay exactly $${amountDollars.toFixed(2)}\n` +
-    `• Stripe takes its payment processing fee\n` +
-    `• StreetLevel pays bands 90% of what remains after Stripe\n\n` +
-    `Example:\n` +
-    `If you spend $${amountDollars.toFixed(2)} on one band, that band would receive about $${bandPayouts[amountDollars]}.\n\n` +
-    `Press OK to continue to checkout.`
-  );
+const ok = window.confirm(
+  `Buy $${amountDollars.toFixed(2)} Street Cred.\n\n` +
+
+  `Total charge will be about $${estimatedTotals[amountDollars]} due to payment fees.\n\n` +
+
+  `• You receive full $${amountDollars.toFixed(2)} credit\n` +
+  `• Larger purchases get more money to bands\n\n` +
+
+  `Press OK to continue.`
+);
 
   if (!ok) return;
 
@@ -2882,9 +2882,9 @@ onChange={(e) => {
                 </p>
 
                 <p style={{ margin: 0 }}>
-                  So here is the new StreetLevel model in plain English: the buyer pays exactly
-                  the amount of Street Cred they want. StreetLevel absorbs Stripe on the front
-                  end, then pays bands 90% of the money left after Stripe fees.
+                  When you buy Street Cred, you pay th strip fee. So $5 of Street Cred will cost $5.45.
+                  StreetLevel takes 10% of the money spent on bands, so that 5 bucks spent on a band,
+                  we take 50 cents, band gets $4.50
                 </p>
 
                 <div
@@ -2907,88 +2907,86 @@ onChange={(e) => {
                   Buyer pays exact value. Bands still come out ahead.
                 </div>
 
-                <div style={{ overflowX: "auto" }}>
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      fontSize: 14,
-                      background: "white",
-                    }}
-                  >
-                    <thead>
-                      <tr>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            borderBottom: "1px solid #ddd",
-                            fontWeight: 950,
-                            whiteSpace: "normal",
-                            lineHeight: 1.15,
-                          }}
-                        >
-                          Buyer
-                          <br />
-                          Spends
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            borderBottom: "1px solid #ddd",
-                            fontWeight: 950,
-                            whiteSpace: "normal",
-                            lineHeight: 1.15,
-                          }}
-                        >
-                          StreetLevel
-                          <br />
-                          Band Gets
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            borderBottom: "1px solid #ddd",
-                            fontWeight: 950,
-                            whiteSpace: "normal",
-                            lineHeight: 1.15,
-                          }}
-                        >
-                          Bandcamp
-                          <br />
-                          Band Gets
-                        </th>
-                      </tr>
-                    </thead>
+ <div style={{ overflowX: "auto" }}>
+  <div
+    style={{
+      fontWeight: 950,
+      fontSize: 18,
+      marginBottom: 8,
+      lineHeight: 1.25,
+    }}
+  >
+    Percent of buyer money that goes to the band on:
+  </div>
 
-                    <tbody>
-                      {[
-                        ["$5", "$4.10", "~$3.83"],
-                        ["$10", "$8.47", "~$7.95"],
-                        ["$20", "$17.21", "~$16.21"],
-                      ].map((row, i) => (
-                        <tr key={i}>
-                          {row.map((cell, j) => (
-                            <td
-                              key={j}
-                              style={{
-                                padding: "10px 12px",
-                                borderBottom: i === 2 ? "none" : "1px solid #eee",
-                                fontWeight: j === 1 ? 950 : 500,
-                                color: j === 1 ? "#0a7f00" : "black",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {cell}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+  <table
+    style={{
+      width: "100%",
+      borderCollapse: "collapse",
+      fontSize: 14,
+      background: "white",
+    }}
+  >
+    <thead>
+      <tr>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "10px 12px",
+            borderBottom: "1px solid #ddd",
+            fontWeight: 950,
+          }}
+        >
+          Amount
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "10px 12px",
+            borderBottom: "1px solid #ddd",
+            fontWeight: 950,
+          }}
+        >
+          StreetLevel
+        </th>
+        <th
+          style={{
+            textAlign: "left",
+            padding: "10px 12px",
+            borderBottom: "1px solid #ddd",
+            fontWeight: 950,
+          }}
+        >
+          Bandcamp
+        </th>
+      </tr>
+    </thead>
+
+    <tbody>
+{[
+  ["$5", "83%", "76%"],
+  ["$10", "85%", "79%"],
+  ["$20", "86%", "81%"],
+].map((row, i) => (
+        <tr key={i}>
+          {row.map((cell, j) => (
+            <td
+              key={j}
+              style={{
+                padding: "10px 12px",
+                borderBottom: i === 2 ? "none" : "1px solid #eee",
+                fontWeight: j === 1 ? 950 : 500,
+                color: j === 1 ? "#0a7f00" : "black",
+              }}
+            >
+              {cell}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
                 <div style={{ fontSize: 13, opacity: 0.72, lineHeight: 1.5 }}>
                   StreetLevel figures here assume the buyer loads one wallet purchase, then spends
