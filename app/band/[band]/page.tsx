@@ -180,6 +180,7 @@ const GENRE_OPTIONS = [
 
   export default function BandDashboard({ params }: { params: Promise<{ band: string }> }) {
     const audioInputRef = useRef<HTMLInputElement | null>(null);
+    const browseFilesInputRef = useRef<HTMLInputElement | null>(null);
     
     const router = useRouter();
     const p = use(params);
@@ -753,6 +754,71 @@ const ins = await supabase.from("tracks").insert({
 });
 
   if (ins.error) throw ins.error;
+}
+
+const AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".mp4"];
+
+function looksLikeAudioFile(file: File) {
+  const name = (file.name || "").toLowerCase();
+  const type = (file.type || "").toLowerCase();
+
+  if (type.startsWith("audio/")) return true;
+
+  // some phones/files come back weird, so extension fallback matters
+  return AUDIO_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+async function openBroadFilePicker() {
+  if (uploading) return;
+
+  if (!uploadProfileComplete) {
+    setStatus(uploadGateMsg);
+    alert(uploadGateMsg);
+    return;
+  }
+
+  try {
+    // Chrome on Android supports this in modern versions, but keep fallback
+    if ("showOpenFilePicker" in window) {
+      const handles = await (window as any).showOpenFilePicker({
+        multiple: true,
+        excludeAcceptAllOption: false,
+        types: [
+          {
+            description: "Audio files",
+            accept: {
+              "audio/*": [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".mp4"],
+            },
+          },
+        ],
+      });
+
+      const files: File[] = [];
+      for (const handle of handles) {
+        const file = await handle.getFile();
+        files.push(file);
+      }
+
+      const valid = files.filter(looksLikeAudioFile);
+
+      if (!valid.length) {
+        setStatus("No supported audio files selected.");
+        alert("Pick audio files like MP3, WAV, M4A, AAC, FLAC, OGG, OPUS, or MP4.");
+        return;
+      }
+
+      setStatus(`Picked ${valid.length} file(s)`);
+      await onUpload(valid);
+      return;
+    }
+  } catch (e: any) {
+    // user cancel is normal; otherwise fall back
+    if (e?.name && e.name !== "AbortError") {
+      console.warn("showOpenFilePicker fallback:", e);
+    }
+  }
+
+  browseFilesInputRef.current?.click();
 }
 
 async function onUpload(filesOrOne: FileList | File | File[]) {
@@ -1784,58 +1850,109 @@ useEffect(() => {
       border: "1px solid #eee",
     }}
   >
-    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-      <button
-        type="button"
-        onClick={() => {
-          if (uploading) return;
+<div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+  <button
+    type="button"
+    onClick={() => {
+      if (uploading) return;
 
-          if (!uploadProfileComplete) {
-            setStatus(uploadGateMsg);
-            alert(uploadGateMsg);
-            return;
-          }
+      if (!uploadProfileComplete) {
+        setStatus(uploadGateMsg);
+        alert(uploadGateMsg);
+        return;
+      }
 
-          audioInputRef.current?.click();
-        }}
-        disabled={uploading || !uploadProfileComplete}
-        style={{
-          padding: "10px 12px",
-          borderRadius: 10,
-          border: "1px solid #ccc",
-          cursor: uploading || !uploadProfileComplete ? "not-allowed" : "pointer",
-          fontWeight: 900,
-          background: "black",
-          color: "#2bff00",
-          opacity: uploading || !uploadProfileComplete ? 0.6 : 1,
-          width: "fit-content",
-          flexShrink: 0,
-        }}
-        title={!uploadProfileComplete ? uploadGateMsg : "Upload audio (multi-select supported)"}
-      >
-        {uploading ? "Uploading..." : "Upload audio"}
-      </button>
+      audioInputRef.current?.click();
+    }}
+    disabled={uploading || !uploadProfileComplete}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid #ccc",
+      cursor: uploading || !uploadProfileComplete ? "not-allowed" : "pointer",
+      fontWeight: 900,
+      background: "black",
+      color: "#2bff00",
+      opacity: uploading || !uploadProfileComplete ? 0.6 : 1,
+      width: "fit-content",
+      flexShrink: 0,
+    }}
+    title={!uploadProfileComplete ? uploadGateMsg : "Audio-first picker"}
+  >
+    {uploading ? "Uploading..." : "Upload audio"}
+  </button>
 
-      <input
-        ref={audioInputRef}
-        type="file"
-        accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus"
-        multiple
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const picked = Array.from(e.currentTarget.files ?? []);
-          e.currentTarget.value = "";
-          if (picked.length === 0) return;
+  <button
+    type="button"
+    onClick={openBroadFilePicker}
+    disabled={uploading || !uploadProfileComplete}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid #ccc",
+      cursor: uploading || !uploadProfileComplete ? "not-allowed" : "pointer",
+      fontWeight: 900,
+      background: "white",
+      color: "black",
+      opacity: uploading || !uploadProfileComplete ? 0.6 : 1,
+      width: "fit-content",
+      flexShrink: 0,
+    }}
+    title={!uploadProfileComplete ? uploadGateMsg : "Broader file browser for Samsung / Android"}
+  >
+    Browse files
+  </button>
 
-          setStatus(`Picked ${picked.length} file(s)`);
-          onUpload(picked);
-        }}
-      />
-    </div>
+  <input
+    ref={audioInputRef}
+    type="file"
+    accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,.mp4"
+    multiple
+    style={{ display: "none" }}
+    onChange={(e) => {
+      const picked = Array.from(e.currentTarget.files ?? []);
+      e.currentTarget.value = "";
+      if (picked.length === 0) return;
+
+      const valid = picked.filter(looksLikeAudioFile);
+      if (!valid.length) {
+        setStatus("No supported audio files selected.");
+        alert("Pick audio files like MP3, WAV, M4A, AAC, FLAC, OGG, OPUS, or MP4.");
+        return;
+      }
+
+      setStatus(`Picked ${valid.length} file(s)`);
+      onUpload(valid);
+    }}
+  />
+
+  <input
+    ref={browseFilesInputRef}
+    type="file"
+    accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,.mp4,audio/*,*/*"
+    multiple
+    style={{ display: "none" }}
+    onChange={(e) => {
+      const picked = Array.from(e.currentTarget.files ?? []);
+      e.currentTarget.value = "";
+      if (picked.length === 0) return;
+
+      const valid = picked.filter(looksLikeAudioFile);
+      if (!valid.length) {
+        setStatus("No supported audio files selected.");
+        alert("Pick audio files like MP3, WAV, M4A, AAC, FLAC, OGG, OPUS, or MP4.");
+        return;
+      }
+
+      setStatus(`Picked ${valid.length} file(s)`);
+      onUpload(valid);
+    }}
+  />
+</div>
 
 {/* 👇 ADD THIS LINE RIGHT HERE */}
 <div style={{ fontSize: 12, opacity: 0.6 }}>
-  On Android/Samsung: choose “My Files” to access your stored music.
+  On Android/Samsung: if “Upload audio” only shows recorder or photos, tap “Browse files” and choose “My Files”, “Downloads”, or internal storage.
 </div>
 
 {!uploadProfileComplete ? (
