@@ -778,19 +778,11 @@ async function openBroadFilePicker() {
   }
 
   try {
-    // Chrome on Android supports this in modern versions, but keep fallback
+    // Prefer a true file/document picker, not an audio-specialized picker
     if ("showOpenFilePicker" in window) {
       const handles = await (window as any).showOpenFilePicker({
         multiple: true,
         excludeAcceptAllOption: false,
-        types: [
-          {
-            description: "Audio files",
-            accept: {
-              "audio/*": [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".mp4"],
-            },
-          },
-        ],
       });
 
       const files: File[] = [];
@@ -1892,8 +1884,8 @@ useEffect(() => {
       border: "1px solid #ccc",
       cursor: uploading || !uploadProfileComplete ? "not-allowed" : "pointer",
       fontWeight: 900,
-      background: "white",
-      color: "black",
+      background: "black",
+      color: "orange",
       opacity: uploading || !uploadProfileComplete ? 0.6 : 1,
       width: "fit-content",
       flexShrink: 0,
@@ -1926,28 +1918,27 @@ useEffect(() => {
     }}
   />
 
-  <input
-    ref={browseFilesInputRef}
-    type="file"
-    accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,.mp4,audio/*,*/*"
-    multiple
-    style={{ display: "none" }}
-    onChange={(e) => {
-      const picked = Array.from(e.currentTarget.files ?? []);
-      e.currentTarget.value = "";
-      if (picked.length === 0) return;
+<input
+  ref={browseFilesInputRef}
+  type="file"
+  multiple
+  style={{ display: "none" }}
+  onChange={(e) => {
+    const picked = Array.from(e.currentTarget.files ?? []);
+    e.currentTarget.value = "";
+    if (picked.length === 0) return;
 
-      const valid = picked.filter(looksLikeAudioFile);
-      if (!valid.length) {
-        setStatus("No supported audio files selected.");
-        alert("Pick audio files like MP3, WAV, M4A, AAC, FLAC, OGG, OPUS, or MP4.");
-        return;
-      }
+    const valid = picked.filter(looksLikeAudioFile);
+    if (!valid.length) {
+      setStatus("No supported audio files selected.");
+      alert("Pick audio files like MP3, WAV, M4A, AAC, FLAC, OGG, OPUS, or MP4.");
+      return;
+    }
 
-      setStatus(`Picked ${valid.length} file(s)`);
-      onUpload(valid);
-    }}
-  />
+    setStatus(`Picked ${valid.length} file(s)`);
+    onUpload(valid);
+  }}
+/>
 </div>
 
 {/* 👇 ADD THIS LINE RIGHT HERE */}
