@@ -224,7 +224,9 @@ export default function HomePage() {
   const [status, setStatus] = useState("");
 
   
- 
+  // band play link fix
+  const hasUrlLaunchRef = useRef(false);
+  const autoLaunchedFromUrlRef = useRef(false);
 
   // prevents the "rebuild queue on filtered change" effect from nuking our start
   const startingRef = useRef(false);
@@ -734,11 +736,13 @@ if (shouldOpenSetup) {
     else if (pr) setWhereStep("province");
     else setWhereStep("country");
 
-    const any = Boolean(co || pr || ci || g || d || qq || evn || off);
-    if (any) {
-      setFiltersOpen(false);
-      setHasStarted(true);
-    }
+const any = Boolean(co || pr || ci || g || d || qq || evn || off);
+hasUrlLaunchRef.current = any;
+
+if (any) {
+  setFiltersOpen(false);
+  setHasStarted(true);
+}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -784,6 +788,22 @@ if (shouldOpenSetup) {
       window.clearTimeout(t2);
     };
   }, []);
+
+useEffect(() => {
+  if (splashPhase !== "off") return;
+  if (!hasUrlLaunchRef.current) return;
+  if (autoLaunchedFromUrlRef.current) return;
+  if (isLoadingTracks) return;
+
+  autoLaunchedFromUrlRef.current = true;
+
+  setHasStarted(true);
+  setFiltersOpen(false);
+
+  radioLetsGo();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [splashPhase]);
+
 
   // ✅ Filter panel sizing
   const FILTER_PANEL_MAX = 560;
