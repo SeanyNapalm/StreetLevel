@@ -2092,7 +2092,7 @@ useEffect(() => {
                         />
                       ) : null}
 
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>Select image → auto-saves</div>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>Chose an image, Example: album cover</div>
                     </div>
 
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

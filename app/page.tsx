@@ -848,11 +848,11 @@ function resetGenreStep() {
     else if (ev.country) setWhereStep("province");
     else setWhereStep("country");
 
-    setHasStarted(true);
-    setFiltersOpen(false);
-    setCalendarOpen(false);
+setHasStarted(true);
+setFiltersOpen(true);   // keep Radio Setup open after picking event
+setCalendarOpen(false); // close only the calendar picker
 
-    autoStartAfterEventPickRef.current = true;
+autoStartAfterEventPickRef.current = false; // wait for "Radio Lets Go"
   }
 
   // keep URL in sync
